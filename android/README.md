@@ -1,71 +1,42 @@
 # CommutePool Android
 
-Kotlin + Jetpack Compose offline-first Android application.
+Kotlin + Jetpack Compose offline-first Android app.
 
-## Tech Stack
+## Stack
 
-- Kotlin 1.9+
-- Jetpack Compose
-- Coroutines + Flow
-- Hilt (DI)
-- Room (local DB)
-- WorkManager (background jobs)
-- Retrofit + OkHttp (API)
-- DataStore (preferences)
-- Coil (images)
+- Kotlin, Jetpack Compose, Material3
+- Hilt (DI), Retrofit + OkHttp (network), Room (local DB), DataStore (token store), WorkManager (background sync)
+- Target SDK 35, Min SDK 26 (Android 8+)
 
-## Module Structure
+## Screens
 
-```
-android/
-├── app/                    # Application shell, DI wiring, navigation graph
-├── core/
-│   ├── model/              # Shared UI models, enums
-│   ├── common/             # Result wrappers, dispatchers, network monitor
-│   ├── ui/                 # Loading, error, empty state primitives
-│   ├── designsystem/       # Theme, colors, typography, icons, spacing
-│   ├── navigation/         # Typed routes, nav arguments, deep links
-│   ├── network/            # Retrofit, OkHttp, auth interceptor
-│   ├── database/           # Room, DAOs, entities, migrations
-│   ├── preferences/        # Encrypted DataStore
-│   ├── analytics/          # Analytics interface
-│   ├── location/           # Fused location, trip checkpoints
-│   ├── notifications/      # Push parsing, local notifications
-│   └── security/           # Encrypted storage, session helpers
-├── data/
-│   ├── auth/
-│   ├── user/
-│   ├── company/
-│   ├── verification/
-│   ├── vehicle/
-│   ├── corridor/
-│   ├── commute/
-│   ├── offer/
-│   ├── request/
-│   ├── match/
-│   ├── trip/
-│   ├── safety/
-│   ├── support/
-│   ├── rating/
-│   └── notification/
-├── feature/
-│   ├── auth/
-│   ├── onboarding/
-│   ├── home/
-│   ├── commute/
-│   ├── offer/
-│   ├── request/
-│   ├── match/
-│   ├── trip/
-│   ├── safety/
-│   ├── support/
-│   ├── notifications/
-│   └── profile/
-└── sync/
-    ├── core/
-    └── workers/
-```
+| Screen | Module |
+|---|---|
+| Login (OTP request) | auth |
+| OTP Verify | auth |
+| Commute Setup | commute |
+| My Offers + Create Offer | offers |
+| Offer Detail + Accept/Decline Requests | offers |
+| My Requests | requests |
+| My Trips + Trip Detail | trips |
+| Notifications | notifications |
+| Support Tickets + Thread | support |
+| SOS | safety |
+| Report Incident | safety |
+
+## Architecture
+
+Clean layered architecture:
+- `data/remote` — Retrofit ApiService + DTOs + AuthInterceptor
+- `data/local` — DataStore TokenStore (Room in next iteration)
+- `di` — Hilt modules (NetworkModule)
+- `ui/screens` — Screen + ViewModel per feature
+- `ui/navigation` — NavHost + Routes
+- `ui/theme` — Material3 CommutePool brand theme
 
 ## Getting Started
 
-See `docs/setup/local-android.md`.
+```bash
+# Open android/ in Android Studio Ladybug or newer
+# Sync Gradle, run on emulator or device
+```
