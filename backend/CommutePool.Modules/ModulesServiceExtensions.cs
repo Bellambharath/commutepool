@@ -1,3 +1,7 @@
+using CommutePool.Modules.Identity;
+using CommutePool.Modules.Outbox;
+using CommutePool.Modules.UserProfile;
+using CommutePool.Modules.Verification;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -9,11 +13,9 @@ public static class ModulesServiceExtensions
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        // Register all MediatR handlers from this assembly
         services.AddMediatR(cfg =>
             cfg.RegisterServicesFromAssembly(typeof(ModulesServiceExtensions).Assembly));
 
-        // Register module-specific services
         services.AddIdentityModule(configuration);
         services.AddUserProfileModule();
         services.AddVerificationModule();
