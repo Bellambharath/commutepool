@@ -13,6 +13,7 @@ public static class ModulesServiceExtensions
         this IServiceCollection services,
         IConfiguration configuration)
     {
+        // MediatR scans entire Modules assembly — all handlers auto-registered
         services.AddMediatR(cfg =>
             cfg.RegisterServicesFromAssembly(typeof(ModulesServiceExtensions).Assembly));
 
@@ -20,6 +21,7 @@ public static class ModulesServiceExtensions
         services.AddUserProfileModule();
         services.AddVerificationModule();
         services.AddOutboxWorker();
+        // Corridor, Commute, Offer, Vehicle handlers auto-picked up by MediatR scan
 
         return services;
     }
