@@ -1,33 +1,40 @@
 # CommutePool Admin Portal
 
-Next.js 14 operations and compliance web portal.
+Angular 17 dashboard — ops/compliance/support surface.
 
-## Roles
+## Stack
 
-- OPS_ADMIN — verification, users, corridors, pricing
-- GRIEVANCE_ADMIN — incidents, support, escalation
-- CORPORATE_ADMIN — company-scoped dashboard
-- SUPER_ADMIN — full access, policy, audit
+- Angular 17 + TypeScript
+- Angular Material (tables, forms, dialogs)
+- RxJS
+- ng2-charts (analytics charts)
+- Shared libs: `@commutepool/api-client`, `@commutepool/shared-models`, `@commutepool/auth`
 
-## Core Features
+## Structure
 
-- Verification queue and review
-- User management and suspension
-- Incident queue and resolution
-- Support tickets and grievance handling
-- Corridor and pricing policy management
-- Company tenant management
-- Audit log visibility
-- KPI analytics
-
-## Tech Stack
-
-- Next.js 14 (App Router)
-- TypeScript strict
-- TanStack Query
-- React Hook Form + Zod
-- Tailwind CSS
+```
+admin/
+├── src/
+│   ├── app/
+│   │   ├── verification/  # Review DL / RC / Selfie queue
+│   │   ├── incidents/     # Safety incidents + SOS alerts
+│   │   ├── support/       # Support ticket queue + threaded view
+│   │   ├── corridors/     # Corridor management
+│   │   ├── pricing/       # Pricing policy per corridor
+│   │   ├── analytics/     # Trip metrics + funnel charts
+│   │   ├── audit/         # Admin audit log
+│   │   └── users/         # User list, profile, trust score
+│   └── environments/
+├── angular.json
+├── package.json
+└── tsconfig.json
+```
 
 ## Getting Started
 
-See `docs/setup/local-admin.md`.
+```bash
+npm install
+ng serve
+```
+
+See `docs/setup/local-admin.md` for env config.

@@ -1,32 +1,41 @@
-# CommutePool Web / PWA
+# CommutePool Web PWA
 
-Next.js 14 installable PWA — management and planning surface for commuters.
+Angular 17 Progressive Web App — user-facing surface.
 
-## Scope
+## Stack
 
-- Commute profile setup
-- Offer and request management
-- Match review and approval
-- Trip history and contributions
-- Support tickets
-- Notification inbox
+- Angular 17 + TypeScript
+- Angular Material (UI components)
+- RxJS (reactive state)
+- @angular/service-worker (PWA / offline)
+- Shared libs: `@commutepool/api-client`, `@commutepool/shared-models`, `@commutepool/auth`
 
-## NOT in scope (mobile-only)
+## Structure
 
-- Live trip execution
-- Primary SOS trigger
-- Real-time trip tracking controls
-
-## Tech Stack
-
-- Next.js 14 (App Router)
-- TypeScript strict
-- TanStack Query
-- React Hook Form + Zod
-- Tailwind CSS
-- IndexedDB (offline drafts)
-- Cache API + Service Worker (PWA)
+```
+web/
+├── src/
+│   ├── app/
+│   │   ├── auth/          # OTP login, token refresh
+│   │   ├── commute/       # Commute profile setup
+│   │   ├── offers/        # Browse and manage offers
+│   │   ├── requests/      # Ride requests
+│   │   ├── trips/         # Trip history and detail
+│   │   ├── support/       # Support tickets
+│   │   ├── profile/       # User profile and verification status
+│   │   └── notifications/ # Notification centre
+│   ├── environments/
+│   └── manifest.webmanifest
+├── angular.json
+├── package.json
+└── tsconfig.json
+```
 
 ## Getting Started
 
-See `docs/setup/local-web.md`.
+```bash
+npm install
+ng serve
+```
+
+See `docs/setup/local-web.md` for env config.
