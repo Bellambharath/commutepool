@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  lint-typecheck-web:
+    name: Web — Lint & Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @commutepool/web type-check
+      - run: pnpm --filter @commutepool/admin type-check
+      - run: pnpm --filter @commutepool/shared type-check
+
+  lint-backend:
+    name: Backend — Build Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: 17
+          distribution: temurin
+      - name: Build backend
+        working-directory: backend/app
+        run: ./gradlew build -x test

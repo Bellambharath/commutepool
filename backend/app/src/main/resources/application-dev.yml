@@ -1,0 +1,10 @@
+spring:
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/commutepool_dev}
+    username: ${DATABASE_USER:postgres}
+    password: ${DATABASE_PASSWORD:postgres}
+
+logging:
+  level:
+    com.commutepool: DEBUG
+    org.springframework.web: DEBUG
