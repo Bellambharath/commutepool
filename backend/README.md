@@ -1,47 +1,45 @@
 # CommutePool Backend
 
-Kotlin + Spring Boot 3 modular monolith.
+.NET 9 + ASP.NET Core Web API — modular monolith.
 
 ## Tech Stack
 
-- Kotlin 1.9+
-- Spring Boot 3.2+
-- PostgreSQL (Supabase)
-- Flyway (migrations)
-- Hilt / Spring DI
-- Coroutines
-- Outbox pattern for async events
+- .NET 9 / ASP.NET Core 9
+- EF Core 9 + Npgsql (PostgreSQL / Supabase)
+- FluentValidation
+- JWT Bearer authentication
+- IHostedService background workers (Outbox relay, match gen, etc.)
+- MediatR (CQRS commands/queries)
+- Serilog (structured logging)
 
 ## Module Structure
 
 ```
 backend/
-├── app/                        # Spring Boot application entry point
-├── modules/
-│   ├── identity/               # OTP auth, session
-│   ├── user-profile/           # User account, emergency contact
-│   ├── company/                # Company tenant, work-email verification
-│   ├── verification/           # DL, RC, selfie review lifecycle
-│   ├── vehicle/                # Bike registry
-│   ├── corridor/               # Service corridors, pickup rules
-│   ├── commute/                # Commute profiles, schedules
-│   ├── offer/                  # Ride offers
-│   ├── request/                # Ride requests
-│   ├── matching/               # Match generation, scoring, recurring pairs
-│   ├── pickup-engine/          # Pickup option generation, pricing delta
-│   ├── trip/                   # Trip lifecycle
-│   ├── trust-rating/           # Ratings, trust scores
-│   ├── safety-incident/        # SOS, incidents, escalation
-│   ├── support-grievance/      # Support tickets, grievance workflows
-│   ├── notification/           # Push, email, in-app notifications
-│   ├── pricing-policy/         # Contribution caps, corridor pricing
-│   ├── admin-audit/            # Admin actions, suspensions, audit log
-│   ├── analytics/              # Funnel, match quality, trip metrics
-│   └── outbox/                 # Transactional outbox for event publication
-├── shared/                     # Shared domain models, utils, base classes
-├── infrastructure/             # DB config, external adapters, security
-└── migrations/                 # Flyway SQL migrations
-    └── sql/
+├── CommutePool.Api/           # Entry point, controllers, middleware, DI wiring
+├── CommutePool.Shared/        # Base classes, result types, pagination, guards
+├── CommutePool.Infrastructure/ # EF Core DbContext, migrations, email, storage
+└── CommutePool.Modules/
+    ├── Identity/              # OTP auth, JWT, sessions
+    ├── UserProfile/           # User account, emergency contact
+    ├── Company/               # Company tenant, work-email verification
+    ├── Verification/          # DL, RC, selfie review lifecycle
+    ├── Vehicle/               # Bike registry
+    ├── Corridor/              # Service corridors
+    ├── Commute/               # Commute profiles, schedules
+    ├── Offer/                 # Ride offers
+    ├── Request/               # Ride requests
+    ├── Matching/              # Match generation, scoring
+    ├── PickupEngine/          # Pickup option generation
+    ├── Trip/                  # Trip lifecycle
+    ├── TrustRating/           # Ratings, trust scores
+    ├── SafetyIncident/        # SOS, incidents, escalation
+    ├── SupportGrievance/      # Support tickets, grievance
+    ├── Notification/          # Push, email, in-app
+    ├── PricingPolicy/         # Contribution caps
+    ├── AdminAudit/            # Admin actions, audit log
+    ├── Analytics/             # Funnel and trip metrics
+    └── Outbox/                # Transactional outbox worker
 ```
 
 ## Getting Started
