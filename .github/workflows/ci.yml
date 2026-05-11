@@ -8,13 +8,13 @@ on:
 
 jobs:
   backend-build:
-    name: Backend — .NET Build & Test
+    name: Backend — .NET 8 Build & Test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 9.x
+          dotnet-version: 8.x
       - name: Restore
         working-directory: backend
         run: dotnet restore

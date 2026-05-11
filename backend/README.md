@@ -1,11 +1,11 @@
 # CommutePool Backend
 
-.NET 9 + ASP.NET Core Web API — modular monolith.
+.NET 8 LTS + ASP.NET Core Web API — modular monolith.
 
 ## Tech Stack
 
-- .NET 9 / ASP.NET Core 9
-- EF Core 9 + Npgsql (PostgreSQL / Supabase)
+- .NET 8 LTS / ASP.NET Core 8
+- EF Core 8 + Npgsql (PostgreSQL / Supabase)
 - FluentValidation
 - JWT Bearer authentication
 - IHostedService background workers (Outbox relay, match gen, etc.)
