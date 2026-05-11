@@ -10,7 +10,7 @@ CommutePool connects verified office commuters for safe, shared bike-based trave
 
 ```
 commutepool/
-├── backend/           # Kotlin + Spring Boot modular monolith
+├── backend/           # .NET 9 + ASP.NET Core modular monolith
 ├── android/           # Kotlin + Jetpack Compose offline-first app
 ├── web/               # Next.js user PWA (planning/management surface)
 ├── admin/             # Next.js admin portal (ops/compliance/support)
@@ -30,11 +30,11 @@ commutepool/
 
 | Layer | Technology |
 |---|---|
-| Backend | Kotlin, Spring Boot 3, PostgreSQL (Supabase), Flyway, Hilt |
+| Backend | C#, .NET 9, ASP.NET Core Web API, EF Core 9, PostgreSQL (Supabase), MediatR, FluentValidation, Serilog |
 | Android | Kotlin, Jetpack Compose, Room, Retrofit, WorkManager, Hilt |
 | Web/PWA | Next.js 14, TypeScript, TanStack Query, Tailwind CSS |
 | Admin | Next.js 14, TypeScript, TanStack Query, Tailwind CSS |
-| Shared | TypeScript types, JSON Schema, design tokens |
+| Shared | TypeScript types, design tokens, validation rules, analytics events |
 
 ## Getting Started
 
