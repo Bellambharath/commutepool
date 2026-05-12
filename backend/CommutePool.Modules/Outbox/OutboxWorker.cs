@@ -36,13 +36,11 @@ public sealed class OutboxWorker(
 
                         ev.Status = "PROCESSED";
                         ev.ProcessedAt = DateTimeOffset.UtcNow;
-                        ev.UpdatedAt = DateTimeOffset.UtcNow;
                     }
                     catch (Exception ex)
                     {
                         ev.Status = "FAILED";
                         ev.LastError = ex.Message;
-                        ev.UpdatedAt = DateTimeOffset.UtcNow;
                         logger.LogError(ex, "Failed to process outbox event {Id}", ev.Id);
                     }
                 }

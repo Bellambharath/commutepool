@@ -19,6 +19,19 @@ public sealed class MatchCandidateEntity
     public DateTimeOffset UpdatedAt { get; set; }
 }
 
+[Table("pickup_options")]
+public sealed class PickupOptionEntity
+{
+    public Guid Id { get; set; }
+    public Guid MatchId { get; set; }
+    public string Label { get; set; } = string.Empty;
+    public double Lat { get; set; }
+    public double Lng { get; set; }
+    public string GeneratedBy { get; set; } = string.Empty; // MIDPOINT | PROXIMITY | MANUAL
+    public bool Selected { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
+}
+
 [Table("trips")]
 public sealed class TripEntity
 {

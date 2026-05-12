@@ -23,7 +23,7 @@ public sealed class GetTripMetricsHandler(
                 Total = g.Count(),
                 Completed = g.Count(t => t.Status == TripStatus.Completed),
                 Cancelled = g.Count(t => t.Status == TripStatus.Cancelled),
-                NoShow = g.Count(t => t.Status == TripStatus.NoShow)
+                Reported = g.Count(t => t.Status == TripStatus.Reported)
             })
             .FirstOrDefaultAsync(ct);
 
@@ -34,7 +34,7 @@ public sealed class GetTripMetricsHandler(
         return Result<TripMetricsDto>.Ok(new TripMetricsDto(
             total, completed,
             trips?.Cancelled ?? 0,
-            trips?.NoShow ?? 0,
+            trips?.Reported ?? 0,
             rate));
     }
 }
@@ -51,7 +51,7 @@ public sealed class GetFunnelMetricsHandler(
         var verifiedUsers = await db.OwnerEligibilities
             .CountAsync(e => e.Status == OwnerEligibilityStatus.Eligible, ct);
         var withProfile = await db.CommuteProfiles.Select(p => p.UserId).Distinct().CountAsync(ct);
-        var madeOffer = await db.Offers.Select(o => o.OwnerId).Distinct().CountAsync(ct);
+        var madeOffer = await db.RideOffers.Select(o => o.OwnerId).Distinct().CountAsync(ct);
         var madeRequest = await db.RideRequests.Select(r => r.RiderId).Distinct().CountAsync(ct);
         var completedTrip = await db.Trips
             .Where(t => t.Status == TripStatus.Completed)

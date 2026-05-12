@@ -14,9 +14,7 @@ public sealed class GenerateMatchHandler(
 {
     public async Task<Result<Guid>> Handle(GenerateMatchCommand req, CancellationToken ct)
     {
-        // Score: base 100, deduct for schedule mismatch, boost for same corridor
-        var offer = await db.Offers
-            .Include(o => o.Vehicle)
+        var offer = await db.RideOffers
             .FirstOrDefaultAsync(o => o.Id == req.OfferId, ct);
 
         var riderProfile = await db.CommuteProfiles
@@ -25,34 +23,39 @@ public sealed class GenerateMatchHandler(
         var ownerProfile = await db.CommuteProfiles
             .FirstOrDefaultAsync(p => p.UserId == req.OwnerId, ct);
 
-        int score = 100;
+        decimal score = 100m;
 
         if (offer is not null && riderProfile is not null && ownerProfile is not null)
         {
-            // Same corridor
-            if (riderProfile.CorridorId == ownerProfile.CorridorId) score += 20;
+            // Boost: same corridor
+            if (riderProfile.CorridorId == ownerProfile.CorridorId) score += 20m;
 
-            // Departure time proximity (within 30 min = +10, within 1hr = +5)
-            var timeDiff = Math.Abs(
-                (offer.DepartureTime - riderProfile.MorningDepartureTime).TotalMinutes);
-            if (timeDiff <= 30) score += 10;
-            else if (timeDiff <= 60) score += 5;
+            // Boost: morning window overlap (rider window midpoint vs owner window midpoint)
+            var riderMid = riderProfile.MorningWindowStart
+                .Add(TimeSpan.FromMinutes(
+                    (riderProfile.MorningWindowEnd - riderProfile.MorningWindowStart).TotalMinutes / 2));
+            var ownerMid = ownerProfile.MorningWindowStart
+                .Add(TimeSpan.FromMinutes(
+                    (ownerProfile.MorningWindowEnd - ownerProfile.MorningWindowStart).TotalMinutes / 2));
+
+            var diffMinutes = Math.Abs((riderMid - ownerMid).TotalMinutes);
+            if (diffMinutes <= 30) score += 10m;
+            else if (diffMinutes <= 60) score += 5m;
         }
 
-        var match = new MatchEntity
+        var match = new MatchCandidateEntity
         {
             Id = Guid.NewGuid(),
             OfferId = req.OfferId,
-            RideRequestId = req.RideRequestId,
-            OwnerId = req.OwnerId,
-            RiderId = req.RiderId,
+            RequestId = req.RideRequestId,
+            CorridorId = riderProfile?.CorridorId ?? ownerProfile?.CorridorId ?? Guid.Empty,
             Score = score,
-            Status = MatchStatus.Confirmed,
+            Status = MatchStatus.Proposed,
             CreatedAt = DateTimeOffset.UtcNow,
             UpdatedAt = DateTimeOffset.UtcNow
         };
 
-        db.Matches.Add(match);
+        db.MatchCandidates.Add(match);
         await db.SaveChangesAsync(ct);
         return Result<Guid>.Ok(match.Id);
     }
@@ -63,9 +66,9 @@ public sealed class ConfirmMatchHandler(
 {
     public async Task<Result> Handle(ConfirmMatchCommand req, CancellationToken ct)
     {
-        var match = await db.Matches.FindAsync([req.MatchId], ct);
+        var match = await db.MatchCandidates.FindAsync([req.MatchId], ct);
         if (match is null) return Result.Fail("NOT_FOUND", "Match not found.");
-        match.Status = MatchStatus.Confirmed;
+        match.Status = MatchStatus.Accepted;
         match.UpdatedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync(ct);
         return Result.Ok();
@@ -77,7 +80,7 @@ public sealed class ExpireMatchHandler(
 {
     public async Task<Result> Handle(ExpireMatchCommand req, CancellationToken ct)
     {
-        var match = await db.Matches.FindAsync([req.MatchId], ct);
+        var match = await db.MatchCandidates.FindAsync([req.MatchId], ct);
         if (match is null) return Result.Fail("NOT_FOUND", "Match not found.");
         match.Status = MatchStatus.Expired;
         match.UpdatedAt = DateTimeOffset.UtcNow;
@@ -91,20 +94,52 @@ public sealed class GetMyMatchesHandler(
 {
     public async Task<Result<List<MatchDto>>> Handle(GetMyMatchesQuery req, CancellationToken ct)
     {
-        var list = await db.Matches
-            .Include(m => m.Owner)
-            .Include(m => m.Rider)
-            .Where(m => m.OwnerId == req.UserId || m.RiderId == req.UserId)
+        // Load candidates where user is owner (via offer) or rider (via request)
+        var offerIds = await db.RideOffers
+            .Where(o => o.OwnerId == req.UserId)
+            .Select(o => o.Id)
+            .ToListAsync(ct);
+
+        var requestIds = await db.RideRequests
+            .Where(r => r.RiderId == req.UserId)
+            .Select(r => r.Id)
+            .ToListAsync(ct);
+
+        var candidates = await db.MatchCandidates
+            .Where(m => offerIds.Contains(m.OfferId) || requestIds.Contains(m.RequestId))
             .OrderByDescending(m => m.CreatedAt)
             .Skip((req.Page - 1) * req.PageSize)
             .Take(req.PageSize)
-            .Select(m => new MatchDto(
-                m.Id, m.OfferId, m.RideRequestId,
-                m.OwnerId, m.Owner.Name ?? string.Empty,
-                m.RiderId, m.Rider.Name ?? string.Empty,
-                m.Score, m.Status.ToString(),
-                m.PickupOptionId, m.CreatedAt))
             .ToListAsync(ct);
+
+        // Resolve owner/rider names via offer → owner and request → rider
+        var allOfferIds = candidates.Select(c => c.OfferId).Distinct().ToList();
+        var allRequestIds = candidates.Select(c => c.RequestId).Distinct().ToList();
+
+        var offerOwners = await db.RideOffers
+            .Where(o => allOfferIds.Contains(o.Id))
+            .Join(db.Users, o => o.OwnerId, u => u.Id,
+                (o, u) => new { o.Id, OwnerId = u.Id, OwnerName = u.Name ?? string.Empty })
+            .ToDictionaryAsync(x => x.Id, ct);
+
+        var requestRiders = await db.RideRequests
+            .Where(r => allRequestIds.Contains(r.Id))
+            .Join(db.Users, r => r.RiderId, u => u.Id,
+                (r, u) => new { r.Id, RiderId = u.Id, RiderName = u.Name ?? string.Empty })
+            .ToDictionaryAsync(x => x.Id, ct);
+
+        var list = candidates.Select(m =>
+        {
+            offerOwners.TryGetValue(m.OfferId, out var ownerInfo);
+            requestRiders.TryGetValue(m.RequestId, out var riderInfo);
+            return new MatchDto(
+                m.Id, m.OfferId, m.RequestId,
+                ownerInfo?.OwnerId ?? Guid.Empty, ownerInfo?.OwnerName ?? string.Empty,
+                riderInfo?.RiderId ?? Guid.Empty, riderInfo?.RiderName ?? string.Empty,
+                (int)(m.Score ?? 0), m.Status.ToString(),
+                null, m.CreatedAt);
+        }).ToList();
+
         return Result<List<MatchDto>>.Ok(list);
     }
 }
@@ -114,16 +149,27 @@ public sealed class GetMatchDetailHandler(
 {
     public async Task<Result<MatchDto>> Handle(GetMatchDetailQuery req, CancellationToken ct)
     {
-        var m = await db.Matches
-            .Include(x => x.Owner)
-            .Include(x => x.Rider)
+        var m = await db.MatchCandidates
             .FirstOrDefaultAsync(x => x.Id == req.MatchId, ct);
         if (m is null) return Result<MatchDto>.Fail("NOT_FOUND", "Match not found.");
+
+        var ownerInfo = await db.RideOffers
+            .Where(o => o.Id == m.OfferId)
+            .Join(db.Users, o => o.OwnerId, u => u.Id,
+                (o, u) => new { OwnerId = u.Id, OwnerName = u.Name ?? string.Empty })
+            .FirstOrDefaultAsync(ct);
+
+        var riderInfo = await db.RideRequests
+            .Where(r => r.Id == m.RequestId)
+            .Join(db.Users, r => r.RiderId, u => u.Id,
+                (r, u) => new { RiderId = u.Id, RiderName = u.Name ?? string.Empty })
+            .FirstOrDefaultAsync(ct);
+
         return Result<MatchDto>.Ok(new MatchDto(
-            m.Id, m.OfferId, m.RideRequestId,
-            m.OwnerId, m.Owner.Name ?? string.Empty,
-            m.RiderId, m.Rider.Name ?? string.Empty,
-            m.Score, m.Status.ToString(),
-            m.PickupOptionId, m.CreatedAt));
+            m.Id, m.OfferId, m.RequestId,
+            ownerInfo?.OwnerId ?? Guid.Empty, ownerInfo?.OwnerName ?? string.Empty,
+            riderInfo?.RiderId ?? Guid.Empty, riderInfo?.RiderName ?? string.Empty,
+            (int)(m.Score ?? 0), m.Status.ToString(),
+            null, m.CreatedAt));
     }
 }

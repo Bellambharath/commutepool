@@ -27,13 +27,18 @@ public sealed class SendRideRequestHandler(
               && r.Status == RideRequestStatus.Active, ct);
         if (duplicate) return Result<Guid>.Fail("ALREADY_ACTIVE", "An active request already exists for this profile.");
 
+        // Parse PickupModePref from string (command carries optional string, entity carries enum)
+        var pickupMode = PickupMode.RoutePointOnly;
+        if (!string.IsNullOrWhiteSpace(req.PickupModePref))
+            Enum.TryParse<PickupMode>(req.PickupModePref, ignoreCase: true, out pickupMode);
+
         var rideRequest = new RideRequestEntity
         {
             Id = Guid.NewGuid(),
             RiderId = req.RiderId,
             CommuteProfileId = req.CommuteProfileId,
             CorridorId = profile.CorridorId,
-            PickupModePref = req.PickupModePref,
+            PickupModePref = pickupMode,
             Status = RideRequestStatus.Active,
             CreatedAt = DateTimeOffset.UtcNow,
             UpdatedAt = DateTimeOffset.UtcNow

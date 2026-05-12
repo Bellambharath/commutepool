@@ -2,6 +2,7 @@ using CommutePool.Infrastructure.Persistence;
 using CommutePool.Infrastructure.Persistence.Entities;
 using CommutePool.Modules.Notification.Commands;
 using CommutePool.Modules.Notification.Queries;
+using CommutePool.Shared.Enums;
 using CommutePool.Shared.Results;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -17,9 +18,9 @@ public sealed class SendInAppNotificationHandler(
         {
             Id = Guid.NewGuid(),
             UserId = req.UserId,
+            NotificationType = req.Category.ToString(),
             Title = req.Title,
             Body = req.Body,
-            Category = req.Category,
             DeepLink = req.DeepLink,
             Read = false,
             CreatedAt = DateTimeOffset.UtcNow
@@ -40,6 +41,8 @@ public sealed class SendPushNotificationHandler(
         {
             Id = Guid.NewGuid(),
             EventType = "PUSH_NOTIFICATION",
+            AggregateType = "Notification",
+            AggregateId = req.UserId,
             Payload = System.Text.Json.JsonSerializer.Serialize(new
             {
                 req.UserId,
@@ -50,8 +53,7 @@ public sealed class SendPushNotificationHandler(
                 req.Data
             }),
             Status = "PENDING",
-            CreatedAt = DateTimeOffset.UtcNow,
-            UpdatedAt = DateTimeOffset.UtcNow
+            CreatedAt = DateTimeOffset.UtcNow
         });
         await db.SaveChangesAsync(ct);
         return Result.Ok();
@@ -97,7 +99,7 @@ public sealed class GetMyNotificationsHandler(
             .Skip((req.Page - 1) * req.PageSize)
             .Take(req.PageSize)
             .Select(n => new NotificationDto(n.Id, n.Title, n.Body,
-                n.Category.ToString(), n.DeepLink, n.Read, n.CreatedAt))
+                n.NotificationType, n.DeepLink, n.Read, n.CreatedAt))
             .ToListAsync(ct);
 
         return Result<List<NotificationDto>>.Ok(list);
