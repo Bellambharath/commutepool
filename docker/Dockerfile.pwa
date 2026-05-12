@@ -1,0 +1,13 @@
+# Stage 1 — build
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY pwa/package*.json ./
+RUN npm ci
+COPY pwa/ .
+RUN npm run build -- --configuration production
+
+# Stage 2 — nginx
+FROM nginx:1.27-alpine AS runner
+COPY --from=builder /app/dist/pwa/browser /usr/share/nginx/html
+COPY docker/nginx.pwa.conf /etc/nginx/conf.d/default.conf
+EXPOSE 80

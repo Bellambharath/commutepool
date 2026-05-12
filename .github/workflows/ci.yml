@@ -1,56 +1,234 @@
-name: CI
+name: CI / CD
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main]
   pull_request:
-    branches: [main, develop]
+    branches: [main]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}/commutepool
 
 jobs:
-  backend-build:
-    name: Backend — .NET 8 Build & Test
+  # ─────────────────────────────────────────
+  # 1. Backend — lint + test + docker build
+  # ─────────────────────────────────────────
+  backend:
+    name: Backend (NestJS)
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: 8.x
-      - name: Restore
-        working-directory: backend
-        run: dotnet restore
-      - name: Build
-        working-directory: backend
-        run: dotnet build --no-restore --configuration Release
-      - name: Test
-        working-directory: backend
-        run: dotnet test --no-build --configuration Release --verbosity normal
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: cp
+          POSTGRES_PASSWORD: cp
+          POSTGRES_DB: commutepool_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
-  web-build:
-    name: Web PWA — Angular Build
-    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
-      - name: Install
-        working-directory: web
-        run: npm ci
-      - name: Build
-        working-directory: web
-        run: npx ng build --configuration production
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
 
-  admin-build:
-    name: Admin Portal — Angular Build
+      - name: Install dependencies
+        run: npm ci
+        working-directory: backend
+
+      - name: Lint
+        run: npm run lint
+        working-directory: backend
+
+      - name: Unit tests
+        run: npm run test -- --coverage --passWithNoTests
+        working-directory: backend
+        env:
+          DATABASE_URL: postgres://cp:cp@localhost:5432/commutepool_test
+          REDIS_URL: redis://localhost:6379
+          JWT_SECRET: test-secret
+          JWT_REFRESH_SECRET: test-refresh-secret
+
+      - name: Build
+        run: npm run build
+        working-directory: backend
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: backend/coverage/
+
+      - name: Log in to GHCR
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & push backend image
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: docker/build-push-action@v5
+        with:
+          context: backend
+          push: true
+          tags: ${{ env.IMAGE_PREFIX }}-api:latest,${{ env.IMAGE_PREFIX }}-api:${{ github.sha }}
+
+  # ─────────────────────────────────────────
+  # 2. Web PWA — lint + test + docker build
+  # ─────────────────────────────────────────
+  pwa:
+    name: Web PWA (Angular)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: pwa/package-lock.json
+
       - name: Install
-        working-directory: admin
         run: npm ci
+        working-directory: pwa
+
+      - name: Lint
+        run: npm run lint
+        working-directory: pwa
+
+      - name: Unit tests
+        run: npm run test -- --watch=false --browsers=ChromeHeadless --passWithNoTests
+        working-directory: pwa
+
       - name: Build
+        run: npm run build -- --configuration production
+        working-directory: pwa
+
+      - name: Log in to GHCR
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & push PWA image
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: docker/build-push-action@v5
+        with:
+          context: pwa
+          push: true
+          tags: ${{ env.IMAGE_PREFIX }}-pwa:latest,${{ env.IMAGE_PREFIX }}-pwa:${{ github.sha }}
+
+  # ─────────────────────────────────────────
+  # 3. Admin Portal — lint + build + docker
+  # ─────────────────────────────────────────
+  admin:
+    name: Admin Portal (Angular)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: admin/package-lock.json
+
+      - name: Install
+        run: npm ci
         working-directory: admin
-        run: npx ng build --configuration production
+
+      - name: Lint
+        run: npm run lint
+        working-directory: admin
+
+      - name: Build
+        run: npm run build -- --configuration production
+        working-directory: admin
+
+      - name: Log in to GHCR
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & push Admin image
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: docker/build-push-action@v5
+        with:
+          context: admin
+          push: true
+          tags: ${{ env.IMAGE_PREFIX }}-admin:latest,${{ env.IMAGE_PREFIX }}-admin:${{ github.sha }}
+
+  # ─────────────────────────────────────────
+  # 4. E2E — Playwright (depends on all builds)
+  # ─────────────────────────────────────────
+  e2e:
+    name: E2E (Playwright)
+    runs-on: ubuntu-latest
+    needs: [backend, pwa, admin]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: e2e/package-lock.json
+
+      - name: Install E2E deps
+        run: npm ci
+        working-directory: e2e
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+        working-directory: e2e
+
+      - name: Start stack
+        run: docker compose -f docker-compose.ci.yml up -d
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+
+      - name: Wait for API health
+        run: |
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:3000/health && break || sleep 3
+          done
+
+      - name: Run Playwright tests
+        run: npx playwright test
+        working-directory: e2e
+        env:
+          BASE_URL_PWA: http://localhost:4200
+          BASE_URL_ADMIN: http://localhost:4201
+          API_URL: http://localhost:3000
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: e2e/playwright-report/
+          retention-days: 14

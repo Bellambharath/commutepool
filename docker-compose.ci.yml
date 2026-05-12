@@ -1,0 +1,51 @@
+version: '3.9'
+# Lightweight CI compose — uses pre-built images from GHCR
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: cp
+      POSTGRES_PASSWORD: cp
+      POSTGRES_DB: commutepool_test
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U cp']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    image: ghcr.io/bellambharath/commutepool-api:${IMAGE_TAG:-latest}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: test
+      DATABASE_URL: postgres://cp:cp@postgres:5432/commutepool_test
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ci-test-secret
+      JWT_REFRESH_SECRET: ci-test-refresh
+      OTP_BYPASS_IN_TEST: 'true'
+    ports:
+      - '3000:3000'
+
+  pwa:
+    image: ghcr.io/bellambharath/commutepool-pwa:${IMAGE_TAG:-latest}
+    depends_on: [api]
+    ports:
+      - '4200:80'
+
+  admin:
+    image: ghcr.io/bellambharath/commutepool-admin:${IMAGE_TAG:-latest}
+    depends_on: [api]
+    ports:
+      - '4201:80'
