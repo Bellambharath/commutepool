@@ -8,7 +8,7 @@ services:
     name: commutepool-api
     runtime: node
     plan: free
-    region: singapore   # closest free region to Chennai
+    region: singapore
     rootDir: backend
     buildCommand: npm ci && npm run build
     startCommand: node dist/main.js
@@ -41,18 +41,17 @@ services:
       # TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM
       # ADMIN_SEED_EMAIL, ADMIN_SEED_PASSWORD
 
-  # ─── PostgreSQL ──────────────────────────────────────────────────────────────
+  # ─── Redis Key-Value ─────────────────────────────────────────────────────────
+  - type: keyValue
+    name: commutepool-redis
+    plan: free
+    region: singapore
+    ipAllowList: []   # only internal access
+
+# ─── PostgreSQL ──────────────────────────────────────────────────────────────
 databases:
   - name: commutepool-db
     plan: free
     region: singapore
     databaseName: commutepool
     user: cp
-
-  # ─── Redis Key-Value ─────────────────────────────────────────────────────────
-services:
-  - type: keyValue
-    name: commutepool-redis
-    plan: free
-    region: singapore
-    ipAllowList: []   # only internal access
