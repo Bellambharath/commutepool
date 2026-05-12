@@ -27,7 +27,6 @@ public sealed class RaiseTicketHandler(
         };
         db.SupportTickets.Add(ticket);
 
-        // First message = initial body
         db.SupportTicketMessages.Add(new SupportTicketMessageEntity
         {
             Id = Guid.NewGuid(),
@@ -137,25 +136,27 @@ public sealed class GetTicketDetailHandler(
     public async Task<Result<TicketDetailDto>> Handle(GetTicketDetailQuery req, CancellationToken ct)
     {
         var ticket = await db.SupportTickets
-            .Include(t => t.SupportTicketMessages)
             .FirstOrDefaultAsync(t => t.Id == req.TicketId, ct);
 
         if (ticket is null) return Result<TicketDetailDto>.Fail("NOT_FOUND", "Ticket not found.");
         if (ticket.UserId != req.RequestingUserId && ticket.AssigneeId != req.RequestingUserId)
             return Result<TicketDetailDto>.Fail("FORBIDDEN", "Not a participant of this ticket.");
 
+        var messages = await db.SupportTicketMessages
+            .Where(m => m.TicketId == req.TicketId)
+            .OrderBy(m => m.CreatedAt)
+            .Select(m => new TicketMessageDto(
+                m.Id, m.SenderId,
+                string.Empty,
+                m.Body, m.CreatedAt))
+            .ToListAsync(ct);
+
         return Result<TicketDetailDto>.Ok(new TicketDetailDto(
             ticket.Id, ticket.UserId,
             ticket.Category ?? string.Empty, ticket.Subject,
             ticket.Status.ToString(), ticket.ResolvedAt?.ToString(),
             ticket.TripId,
-            ticket.SupportTicketMessages
-                .OrderBy(m => m.CreatedAt)
-                .Select(m => new TicketMessageDto(
-                    m.Id, m.SenderId,
-                    string.Empty,
-                    m.Body, m.CreatedAt))
-                .ToList(),
+            messages,
             ticket.CreatedAt));
     }
 }

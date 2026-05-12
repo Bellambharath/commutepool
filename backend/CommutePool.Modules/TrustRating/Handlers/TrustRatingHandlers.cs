@@ -59,20 +59,20 @@ public sealed class RecomputeTrustScoreHandler(
     {
         var ratings = await db.Ratings
             .Where(r => r.RatedUserId == req.UserId)
+            .OrderByDescending(r => r.CreatedAt)
             .ToListAsync(ct);
 
         if (ratings.Count == 0)
             return Result<double>.Ok(0.0);
 
-        // Weighted: recent ratings count more (last 20 get 2x weight)
-        var ordered = ratings.OrderByDescending(r => r.CreatedAt).ToList();
+        // Weighted: recent ratings (first 20) count 2x
         double weightedSum = 0;
         double totalWeight = 0;
 
-        for (int i = 0; i < ordered.Count; i++)
+        for (int i = 0; i < ratings.Count; i++)
         {
             double weight = i < 20 ? 2.0 : 1.0;
-            weightedSum += ordered[i].Stars * weight;
+            weightedSum += ratings[i].Stars * weight;
             totalWeight += weight;
         }
 
@@ -85,7 +85,7 @@ public sealed class RecomputeTrustScoreHandler(
             {
                 Id = Guid.NewGuid(),
                 UserId = req.UserId,
-                Score = score,
+                Score = (decimal)score,
                 TotalRatings = ratings.Count,
                 UpdatedAt = DateTimeOffset.UtcNow
             };
@@ -93,7 +93,7 @@ public sealed class RecomputeTrustScoreHandler(
         }
         else
         {
-            trustScore.Score = score;
+            trustScore.Score = (decimal)score;
             trustScore.TotalRatings = ratings.Count;
             trustScore.UpdatedAt = DateTimeOffset.UtcNow;
         }
@@ -111,9 +111,9 @@ public sealed class GetUserTrustScoreHandler(
         var trustScore = await db.TrustScores
             .FirstOrDefaultAsync(s => s.UserId == req.UserId, ct);
 
-        var score = trustScore?.Score ?? 0.0;
+        var score = trustScore is not null ? (double)trustScore.Score : 0.0;
         var totalRatings = trustScore?.TotalRatings ?? 0;
-        var updatedAt = trustScore?.UpdatedAt;
+        var updatedAt = trustScore?.UpdatedAt ?? DateTimeOffset.MinValue;
 
         return Result<TrustScoreDto>.Ok(new TrustScoreDto(
             req.UserId,

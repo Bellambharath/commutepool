@@ -46,3 +46,26 @@ public sealed class SupportTicketMessageEntity
     public string Body { get; set; } = string.Empty;
     public DateTimeOffset CreatedAt { get; set; }
 }
+
+[Table("ratings")]
+public sealed class RatingEntity
+{
+    public Guid Id { get; set; }
+    public Guid TripId { get; set; }
+    public Guid RaterUserId { get; set; }
+    public Guid RatedUserId { get; set; }
+    public int Stars { get; set; }
+    public string? Comment { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
+    public UserEntity Rater { get; set; } = null!;
+}
+
+[Table("trust_scores")]
+public sealed class TrustScoreEntity
+{
+    public Guid Id { get; set; }
+    public Guid UserId { get; set; }
+    public decimal Score { get; set; }
+    public int TotalRatings { get; set; }
+    public DateTimeOffset UpdatedAt { get; set; }
+}

@@ -9,31 +9,32 @@ using Microsoft.EntityFrameworkCore;
 
 namespace CommutePool.Modules.Request.Handlers;
 
+// RideRequest in the current schema is a rider's corridor-based request (not offer-specific).
+// Status values: Active, Paused, Closed  (RideRequestStatus enum)
+
 public sealed class SendRideRequestHandler(
     CommutePoolDbContext db) : IRequestHandler<SendRideRequestCommand, Result<Guid>>
 {
     public async Task<Result<Guid>> Handle(SendRideRequestCommand req, CancellationToken ct)
     {
-        var offer = await db.Offers.FindAsync([req.OfferId], ct);
-        if (offer is null) return Result<Guid>.Fail("NOT_FOUND", "Offer not found.");
-        if (offer.OwnerId == req.RiderId) return Result<Guid>.Fail("SELF_REQUEST", "Cannot request your own offer.");
-        if (offer.Status is not (OfferStatus.Open or OfferStatus.Partial))
-            return Result<Guid>.Fail("OFFER_UNAVAILABLE", "Offer is not accepting requests.");
-        if (offer.AvailableSeats - offer.AcceptedSeats <= 0)
-            return Result<Guid>.Fail("NO_SEATS", "No seats available.");
+        var profile = await db.CommuteProfiles.FindAsync([req.CommuteProfileId], ct);
+        if (profile is null) return Result<Guid>.Fail("NOT_FOUND", "Commute profile not found.");
+        if (profile.UserId != req.RiderId) return Result<Guid>.Fail("FORBIDDEN", "Not your commute profile.");
 
         var duplicate = await db.RideRequests.AnyAsync(
-            r => r.OfferId == req.OfferId && r.RiderId == req.RiderId
-              && r.Status == RideRequestStatus.Pending, ct);
-        if (duplicate) return Result<Guid>.Fail("ALREADY_REQUESTED", "You already have a pending request for this offer.");
+            r => r.RiderId == req.RiderId
+              && r.CommuteProfileId == req.CommuteProfileId
+              && r.Status == RideRequestStatus.Active, ct);
+        if (duplicate) return Result<Guid>.Fail("ALREADY_ACTIVE", "An active request already exists for this profile.");
 
         var rideRequest = new RideRequestEntity
         {
             Id = Guid.NewGuid(),
-            OfferId = req.OfferId,
             RiderId = req.RiderId,
-            Status = RideRequestStatus.Pending,
-            Note = req.Note,
+            CommuteProfileId = req.CommuteProfileId,
+            CorridorId = profile.CorridorId,
+            PickupModePref = req.PickupModePref,
+            Status = RideRequestStatus.Active,
             CreatedAt = DateTimeOffset.UtcNow,
             UpdatedAt = DateTimeOffset.UtcNow
         };
@@ -43,78 +44,54 @@ public sealed class SendRideRequestHandler(
     }
 }
 
-public sealed class WithdrawRideRequestHandler(
-    CommutePoolDbContext db) : IRequestHandler<WithdrawRideRequestCommand, Result>
+public sealed class PauseRideRequestHandler(
+    CommutePoolDbContext db) : IRequestHandler<PauseRideRequestCommand, Result>
 {
-    public async Task<Result> Handle(WithdrawRideRequestCommand req, CancellationToken ct)
+    public async Task<Result> Handle(PauseRideRequestCommand req, CancellationToken ct)
     {
         var rideRequest = await db.RideRequests
             .FirstOrDefaultAsync(r => r.Id == req.RequestId && r.RiderId == req.RiderId, ct);
         if (rideRequest is null) return Result.Fail("NOT_FOUND", "Request not found.");
-        if (rideRequest.Status != RideRequestStatus.Pending)
-            return Result.Fail("INVALID_STATE", "Only pending requests can be withdrawn.");
+        if (rideRequest.Status != RideRequestStatus.Active)
+            return Result.Fail("INVALID_STATE", "Only active requests can be paused.");
 
-        rideRequest.Status = RideRequestStatus.Withdrawn;
+        rideRequest.Status = RideRequestStatus.Paused;
         rideRequest.UpdatedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync(ct);
         return Result.Ok();
     }
 }
 
-public sealed class AcceptRideRequestHandler(
-    CommutePoolDbContext db,
-    IMediator mediator) : IRequestHandler<AcceptRideRequestCommand, Result>
+public sealed class ResumeRideRequestHandler(
+    CommutePoolDbContext db) : IRequestHandler<ResumeRideRequestCommand, Result>
 {
-    public async Task<Result> Handle(AcceptRideRequestCommand req, CancellationToken ct)
+    public async Task<Result> Handle(ResumeRideRequestCommand req, CancellationToken ct)
     {
         var rideRequest = await db.RideRequests
-            .Include(r => r.Offer)
-            .FirstOrDefaultAsync(r => r.Id == req.RequestId, ct);
+            .FirstOrDefaultAsync(r => r.Id == req.RequestId && r.RiderId == req.RiderId, ct);
         if (rideRequest is null) return Result.Fail("NOT_FOUND", "Request not found.");
-        if (rideRequest.Offer.OwnerId != req.OwnerId)
-            return Result.Fail("FORBIDDEN", "Not your offer.");
-        if (rideRequest.Status != RideRequestStatus.Pending)
-            return Result.Fail("INVALID_STATE", "Request is not pending.");
+        if (rideRequest.Status != RideRequestStatus.Paused)
+            return Result.Fail("INVALID_STATE", "Only paused requests can be resumed.");
 
-        var offer = rideRequest.Offer;
-        if (offer.AvailableSeats - offer.AcceptedSeats <= 0)
-            return Result.Fail("NO_SEATS", "No seats left.");
-
-        rideRequest.Status = RideRequestStatus.Accepted;
+        rideRequest.Status = RideRequestStatus.Active;
         rideRequest.UpdatedAt = DateTimeOffset.UtcNow;
-
-        offer.AcceptedSeats += 1;
-        offer.Status = offer.AcceptedSeats >= offer.AvailableSeats
-            ? OfferStatus.Full
-            : OfferStatus.Partial;
-        offer.UpdatedAt = DateTimeOffset.UtcNow;
-
         await db.SaveChangesAsync(ct);
-
-        // Trigger match generation for this pair
-        await mediator.Send(new Matching.Commands.GenerateMatchCommand(
-            rideRequest.Id, offer.Id, rideRequest.RiderId, offer.OwnerId), ct);
-
         return Result.Ok();
     }
 }
 
-public sealed class DeclineRideRequestHandler(
-    CommutePoolDbContext db) : IRequestHandler<DeclineRideRequestCommand, Result>
+public sealed class CloseRideRequestHandler(
+    CommutePoolDbContext db) : IRequestHandler<CloseRideRequestCommand, Result>
 {
-    public async Task<Result> Handle(DeclineRideRequestCommand req, CancellationToken ct)
+    public async Task<Result> Handle(CloseRideRequestCommand req, CancellationToken ct)
     {
         var rideRequest = await db.RideRequests
-            .Include(r => r.Offer)
-            .FirstOrDefaultAsync(r => r.Id == req.RequestId, ct);
+            .FirstOrDefaultAsync(r => r.Id == req.RequestId && r.RiderId == req.RiderId, ct);
         if (rideRequest is null) return Result.Fail("NOT_FOUND", "Request not found.");
-        if (rideRequest.Offer.OwnerId != req.OwnerId)
-            return Result.Fail("FORBIDDEN", "Not your offer.");
-        if (rideRequest.Status != RideRequestStatus.Pending)
-            return Result.Fail("INVALID_STATE", "Request is not pending.");
+        if (rideRequest.Status == RideRequestStatus.Closed)
+            return Result.Fail("ALREADY_CLOSED", "Request is already closed.");
 
-        rideRequest.Status = RideRequestStatus.Declined;
-        rideRequest.DeclineReason = req.Reason;
+        rideRequest.Status = RideRequestStatus.Closed;
         rideRequest.UpdatedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync(ct);
         return Result.Ok();
@@ -127,33 +104,14 @@ public sealed class GetMyRideRequestsHandler(
     public async Task<Result<List<RideRequestDto>>> Handle(GetMyRideRequestsQuery req, CancellationToken ct)
     {
         var list = await db.RideRequests
-            .Include(r => r.Rider)
             .Where(r => r.RiderId == req.RiderId)
             .OrderByDescending(r => r.CreatedAt)
             .Skip((req.Page - 1) * req.PageSize)
             .Take(req.PageSize)
-            .Select(r => new RideRequestDto(r.Id, r.OfferId, r.RiderId, r.Rider.Name ?? string.Empty,
-                r.Status.ToString(), r.Note, r.DeclineReason, r.CreatedAt))
-            .ToListAsync(ct);
-        return Result<List<RideRequestDto>>.Ok(list);
-    }
-}
-
-public sealed class GetRequestsForOfferHandler(
-    CommutePoolDbContext db) : IRequestHandler<GetRequestsForOfferQuery, Result<List<RideRequestDto>>>
-{
-    public async Task<Result<List<RideRequestDto>>> Handle(GetRequestsForOfferQuery req, CancellationToken ct)
-    {
-        var offer = await db.Offers.FindAsync([req.OfferId], ct);
-        if (offer is null || offer.OwnerId != req.OwnerId)
-            return Result<List<RideRequestDto>>.Fail("FORBIDDEN", "Not your offer.");
-
-        var list = await db.RideRequests
-            .Include(r => r.Rider)
-            .Where(r => r.OfferId == req.OfferId)
-            .OrderByDescending(r => r.CreatedAt)
-            .Select(r => new RideRequestDto(r.Id, r.OfferId, r.RiderId, r.Rider.Name ?? string.Empty,
-                r.Status.ToString(), r.Note, r.DeclineReason, r.CreatedAt))
+            .Select(r => new RideRequestDto(
+                r.Id, r.RiderId, r.CommuteProfileId, r.CorridorId,
+                r.PickupModePref.ToString(), r.Status.ToString(),
+                r.CreatedAt, r.UpdatedAt))
             .ToListAsync(ct);
         return Result<List<RideRequestDto>>.Ok(list);
     }
