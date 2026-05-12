@@ -2,7 +2,6 @@ using CommutePool.Api.Middleware;
 using CommutePool.Infrastructure;
 using CommutePool.Modules;
 using FluentValidation;
-using MediatR;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
@@ -17,8 +16,14 @@ builder.Host.UseSerilog((ctx, cfg) =>
        .WriteTo.Console());
 
 // ── JWT Auth ─────────────────────────────────────────────────────────────────
-var jwtSecret = builder.Configuration["Jwt:Secret"]
-    ?? throw new InvalidOperationException("Jwt:Secret is required");
+// Read from env var first (Render secret), then appsettings fallback
+var jwtSecret =
+    Environment.GetEnvironmentVariable("JWT_SECRET")
+    ?? builder.Configuration["Jwt:Secret"];
+
+if (string.IsNullOrWhiteSpace(jwtSecret))
+    throw new InvalidOperationException(
+        "JWT secret is required. Set JWT_SECRET env var or Jwt:Secret in appsettings.");
 
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -40,6 +45,7 @@ builder.Services.AddAuthorization();
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddHealthChecks();
 
 // ── Infrastructure (EF Core, repositories) ───────────────────────────────────
 builder.Services.AddInfrastructure(builder.Configuration);
@@ -66,15 +72,17 @@ var app = builder.Build();
 app.UseSerilogRequestLogging();
 app.UseMiddleware<ExceptionMiddleware>();
 
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+// Swagger enabled in all environments (protected by auth if needed later)
+app.UseSwagger();
+app.UseSwaggerUI();
 
 app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
+
+// ── Health check (Render uses this to confirm the service is up) ──────────────
+app.MapHealthChecks("/health");
+
 app.MapControllers();
 
 app.Run();
