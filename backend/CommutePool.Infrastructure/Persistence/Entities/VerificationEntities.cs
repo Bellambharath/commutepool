@@ -119,27 +119,3 @@ public sealed class PickupOptionEntity
     public bool Selected { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
 }
-
-[Table("ratings")]
-public sealed class RatingEntity
-{
-    public Guid Id { get; set; }
-    public Guid TripId { get; set; }
-    public Guid RaterId { get; set; }
-    public Guid RateeId { get; set; }
-    public int Score { get; set; }
-    public string? Comment { get; set; }
-    public DateTimeOffset CreatedAt { get; set; }
-}
-
-[Table("trust_scores")]
-public sealed class TrustScoreEntity
-{
-    public Guid Id { get; set; }
-    public Guid UserId { get; set; }
-    public decimal Score { get; set; } = 5.0m;
-    public int TripCount { get; set; }
-    public int RatingCount { get; set; }
-    public DateTimeOffset UpdatedAt { get; set; }
-    public UserEntity User { get; set; } = null!;
-}
