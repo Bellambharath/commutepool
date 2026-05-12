@@ -25,7 +25,7 @@ services:
       - key: REDIS_URL
         fromService:
           name: commutepool-redis
-          type: keyValue
+          type: redis
           property: connectionString
       - key: JWT_SECRET
         generateValue: true
@@ -41,8 +41,8 @@ services:
       # TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM
       # ADMIN_SEED_EMAIL, ADMIN_SEED_PASSWORD
 
-  # ─── Redis Key-Value ─────────────────────────────────────────────────────────
-  - type: keyValue
+  # ─── Redis ─────────────────────────────────────────────────────────────────
+  - type: redis
     name: commutepool-redis
     plan: free
     region: singapore
