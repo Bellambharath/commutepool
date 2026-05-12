@@ -5,18 +5,17 @@ namespace CommutePool.Modules.Request.Commands;
 
 public sealed record SendRideRequestCommand(
     Guid RiderId,
-    Guid OfferId,
-    string? Note) : IRequest<Result<Guid>>;
+    Guid CommuteProfileId,
+    string? PickupModePref) : IRequest<Result<Guid>>;
 
-public sealed record WithdrawRideRequestCommand(
-    Guid RiderId,
-    Guid RequestId) : IRequest<Result>;
-
-public sealed record AcceptRideRequestCommand(
-    Guid OwnerId,
-    Guid RequestId) : IRequest<Result>;
-
-public sealed record DeclineRideRequestCommand(
-    Guid OwnerId,
+public sealed record PauseRideRequestCommand(
     Guid RequestId,
-    string Reason) : IRequest<Result>;
+    Guid RiderId) : IRequest<Result>;
+
+public sealed record ResumeRideRequestCommand(
+    Guid RequestId,
+    Guid RiderId) : IRequest<Result>;
+
+public sealed record CloseRideRequestCommand(
+    Guid RequestId,
+    Guid RiderId) : IRequest<Result>;
