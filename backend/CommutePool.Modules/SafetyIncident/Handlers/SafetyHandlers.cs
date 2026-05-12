@@ -14,23 +14,20 @@ public sealed class RaiseSosHandler(
 {
     public async Task<Result<Guid>> Handle(RaiseSosCommand req, CancellationToken ct)
     {
-        var incident = new SafetyIncidentEntity
+        var incident = new IncidentEntity
         {
             Id = Guid.NewGuid(),
-            ReportedByUserId = req.UserId,
+            ReporterId = req.UserId,
             TripId = req.TripId,
             IncidentType = IncidentType.Sos,
+            Severity = IncidentSeverity.Critical,
             Status = IncidentStatus.Open,
             Description = req.Note ?? "SOS raised.",
-            IsSos = true,
-            Lat = req.Lat,
-            Lng = req.Lng,
             CreatedAt = DateTimeOffset.UtcNow,
             UpdatedAt = DateTimeOffset.UtcNow
         };
-        db.SafetyIncidents.Add(incident);
+        db.Incidents.Add(incident);
         await db.SaveChangesAsync(ct);
-        // TODO: Push high-priority notification to ops team
         return Result<Guid>.Ok(incident.Id);
     }
 }
@@ -40,19 +37,19 @@ public sealed class ReportIncidentHandler(
 {
     public async Task<Result<Guid>> Handle(ReportIncidentCommand req, CancellationToken ct)
     {
-        var incident = new SafetyIncidentEntity
+        var incident = new IncidentEntity
         {
             Id = Guid.NewGuid(),
-            ReportedByUserId = req.ReportedByUserId,
+            ReporterId = req.ReportedByUserId,
             TripId = req.TripId,
             IncidentType = req.IncidentType,
+            Severity = IncidentSeverity.Medium,
             Status = IncidentStatus.Open,
             Description = req.Description,
-            IsSos = false,
             CreatedAt = DateTimeOffset.UtcNow,
             UpdatedAt = DateTimeOffset.UtcNow
         };
-        db.SafetyIncidents.Add(incident);
+        db.Incidents.Add(incident);
         await db.SaveChangesAsync(ct);
         return Result<Guid>.Ok(incident.Id);
     }
@@ -63,13 +60,12 @@ public sealed class EscalateIncidentHandler(
 {
     public async Task<Result> Handle(EscalateIncidentCommand req, CancellationToken ct)
     {
-        var incident = await db.SafetyIncidents.FindAsync([req.IncidentId], ct);
+        var incident = await db.Incidents.FindAsync([req.IncidentId], ct);
         if (incident is null) return Result.Fail("NOT_FOUND", "Incident not found.");
         if (incident.Status == IncidentStatus.Resolved)
             return Result.Fail("ALREADY_RESOLVED", "Incident is already resolved.");
 
         incident.Status = IncidentStatus.Escalated;
-        incident.EscalationNote = req.Note;
         incident.UpdatedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync(ct);
         return Result.Ok();
@@ -81,11 +77,11 @@ public sealed class ResolveIncidentHandler(
 {
     public async Task<Result> Handle(ResolveIncidentCommand req, CancellationToken ct)
     {
-        var incident = await db.SafetyIncidents.FindAsync([req.IncidentId], ct);
+        var incident = await db.Incidents.FindAsync([req.IncidentId], ct);
         if (incident is null) return Result.Fail("NOT_FOUND", "Incident not found.");
 
         incident.Status = IncidentStatus.Resolved;
-        incident.Resolution = req.Resolution;
+        incident.ResolutionNote = req.Resolution;
         incident.ResolvedAt = DateTimeOffset.UtcNow;
         incident.UpdatedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync(ct);
@@ -98,21 +94,18 @@ public sealed class GetMyIncidentsHandler(
 {
     public async Task<Result<List<IncidentDto>>> Handle(GetMyIncidentsQuery req, CancellationToken ct)
     {
-        var list = await db.SafetyIncidents
-            .Include(i => i.ReportedBy)
-            .Where(i => i.ReportedByUserId == req.UserId)
+        var list = await db.Incidents
+            .Where(i => i.ReporterId == req.UserId)
             .OrderByDescending(i => i.CreatedAt)
             .Skip((req.Page - 1) * req.PageSize)
             .Take(req.PageSize)
-            .Select(i => Map(i))
+            .Select(i => new IncidentDto(
+                i.Id, i.ReporterId, i.TripId,
+                i.IncidentType.ToString(), i.Status.ToString(),
+                i.Description, i.CreatedAt, i.ResolvedAt))
             .ToListAsync(ct);
         return Result<List<IncidentDto>>.Ok(list);
     }
-    private static IncidentDto Map(SafetyIncidentEntity i) => new(
-        i.Id, i.ReportedByUserId, i.ReportedBy.Name ?? string.Empty,
-        i.TripId, i.IncidentType.ToString(), i.Status.ToString(),
-        i.Description, i.EscalationNote, i.Resolution,
-        i.IsSos, i.Lat, i.Lng, i.CreatedAt, i.ResolvedAt);
 }
 
 public sealed class GetIncidentDetailHandler(
@@ -120,17 +113,15 @@ public sealed class GetIncidentDetailHandler(
 {
     public async Task<Result<IncidentDto>> Handle(GetIncidentDetailQuery req, CancellationToken ct)
     {
-        var i = await db.SafetyIncidents
-            .Include(x => x.ReportedBy)
+        var i = await db.Incidents
             .FirstOrDefaultAsync(x => x.Id == req.IncidentId, ct);
         if (i is null) return Result<IncidentDto>.Fail("NOT_FOUND", "Incident not found.");
-        if (i.ReportedByUserId != req.RequestingUserId)
+        if (i.ReporterId != req.RequestingUserId)
             return Result<IncidentDto>.Fail("FORBIDDEN", "Not your incident.");
         return Result<IncidentDto>.Ok(new IncidentDto(
-            i.Id, i.ReportedByUserId, i.ReportedBy.Name ?? string.Empty,
-            i.TripId, i.IncidentType.ToString(), i.Status.ToString(),
-            i.Description, i.EscalationNote, i.Resolution,
-            i.IsSos, i.Lat, i.Lng, i.CreatedAt, i.ResolvedAt));
+            i.Id, i.ReporterId, i.TripId,
+            i.IncidentType.ToString(), i.Status.ToString(),
+            i.Description, i.CreatedAt, i.ResolvedAt));
     }
 }
 
@@ -139,22 +130,20 @@ public sealed class GetAllIncidentsAdminHandler(
 {
     public async Task<Result<List<IncidentDto>>> Handle(GetAllIncidentsAdminQuery req, CancellationToken ct)
     {
-        var query = db.SafetyIncidents.Include(i => i.ReportedBy).AsQueryable();
+        var query = db.Incidents.AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(req.Status) &&
             Enum.TryParse<IncidentStatus>(req.Status, true, out var statusFilter))
             query = query.Where(i => i.Status == statusFilter);
 
         var list = await query
-            .OrderByDescending(i => i.IsSos)
-            .ThenByDescending(i => i.CreatedAt)
+            .OrderByDescending(i => i.CreatedAt)
             .Skip((req.Page - 1) * req.PageSize)
             .Take(req.PageSize)
             .Select(i => new IncidentDto(
-                i.Id, i.ReportedByUserId, i.ReportedBy.Name ?? string.Empty,
-                i.TripId, i.IncidentType.ToString(), i.Status.ToString(),
-                i.Description, i.EscalationNote, i.Resolution,
-                i.IsSos, i.Lat, i.Lng, i.CreatedAt, i.ResolvedAt))
+                i.Id, i.ReporterId, i.TripId,
+                i.IncidentType.ToString(), i.Status.ToString(),
+                i.Description, i.CreatedAt, i.ResolvedAt))
             .ToListAsync(ct);
 
         return Result<List<IncidentDto>>.Ok(list);
