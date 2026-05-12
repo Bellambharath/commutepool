@@ -1,0 +1,58 @@
+# CommutePool — Render Blueprint (full free tier)
+# Deploy via: Render Dashboard → New → Blueprint → connect this repo
+
+services:
+
+  # ─── NestJS API ──────────────────────────────────────────────────────────────
+  - type: web
+    name: commutepool-api
+    runtime: node
+    plan: free
+    region: singapore   # closest free region to Chennai
+    rootDir: backend
+    buildCommand: npm ci && npm run build
+    startCommand: node dist/main.js
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: DATABASE_URL
+        fromDatabase:
+          name: commutepool-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: commutepool-redis
+          type: keyValue
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 15m
+      - key: JWT_REFRESH_EXPIRES_IN
+        value: 7d
+      - key: OTP_BYPASS_IN_TEST
+        value: false
+      # Add manually in Render dashboard after deploy:
+      # TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM
+      # ADMIN_SEED_EMAIL, ADMIN_SEED_PASSWORD
+
+  # ─── PostgreSQL ──────────────────────────────────────────────────────────────
+databases:
+  - name: commutepool-db
+    plan: free
+    region: singapore
+    databaseName: commutepool
+    user: cp
+
+  # ─── Redis Key-Value ─────────────────────────────────────────────────────────
+services:
+  - type: keyValue
+    name: commutepool-redis
+    plan: free
+    region: singapore
+    ipAllowList: []   # only internal access

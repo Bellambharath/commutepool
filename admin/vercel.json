@@ -1,0 +1,14 @@
+{
+  "buildCommand": "npm run build -- --configuration production",
+  "outputDirectory": "dist/admin/browser",
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://commutepool-api.onrender.com/api/:path*"
+    },
+    {
+      "source": "/((?!api).*)",
+      "destination": "/index.html"
+    }
+  ]
+}

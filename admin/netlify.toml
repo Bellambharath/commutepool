@@ -1,0 +1,30 @@
+# CommutePool Admin Portal — Netlify deployment config
+# Site URL: admin.pghive.in
+
+[build]
+  base      = "admin"
+  command   = "npm ci && npm run build -- --configuration production"
+  publish   = "dist/admin/browser"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# SPA fallback
+[[redirects]]
+  from   = "/*"
+  to     = "/index.html"
+  status = 200
+
+# Proxy /api/* → Render backend
+[[redirects]]
+  from   = "/api/*"
+  to     = "https://commutepool-api.onrender.com/api/:splat"
+  status = 200
+  force  = true
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options        = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy        = "strict-origin-when-cross-origin"
