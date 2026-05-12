@@ -1,52 +1,48 @@
-# CommutePool — Render Blueprint (full free tier)
-# Deploy via: Render Dashboard → New → Blueprint → connect this repo
+# CommutePool — Render Blueprint
+# Backend: ASP.NET Core 8 (.NET) via Docker
+# DB: PostgreSQL (free) | Cache: Redis (free)
 
 services:
 
-  # ─── NestJS API ──────────────────────────────────────────────────────────────
+  # ─── ASP.NET Core API (Docker) ───────────────────────────────────────────────
   - type: web
     name: commutepool-api
-    runtime: node
+    runtime: image
     plan: free
     region: singapore
-    rootDir: backend
-    buildCommand: npm install && npm run build
-    startCommand: node dist/main.js
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
     healthCheckPath: /health
     envVars:
-      - key: NODE_ENV
-        value: production
-      - key: PORT
-        value: 3000
-      - key: DATABASE_URL
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: ASPNETCORE_URLS
+        value: http://+:10000
+      - key: ConnectionStrings__DefaultConnection
         fromDatabase:
           name: commutepool-db
           property: connectionString
-      - key: REDIS_URL
+      - key: Redis__ConnectionString
         fromService:
           name: commutepool-redis
           type: redis
           property: connectionString
-      - key: JWT_SECRET
+      - key: Jwt__Secret
         generateValue: true
-      - key: JWT_REFRESH_SECRET
-        generateValue: true
-      - key: JWT_EXPIRES_IN
-        value: 15m
-      - key: JWT_REFRESH_EXPIRES_IN
-        value: 7d
-      - key: OTP_BYPASS_IN_TEST
-        value: false
-      # Add manually in Render dashboard after deploy:
-      # TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM
-      # ADMIN_SEED_EMAIL, ADMIN_SEED_PASSWORD
+      - key: Jwt__Issuer
+        value: commutepool-api
+      - key: Jwt__Audience
+        value: commutepool-client
+      # Add manually in Render dashboard after first deploy:
+      # Twilio__AccountSid, Twilio__AuthToken, Twilio__FromNumber
+      # Admin__SeedEmail, Admin__SeedPassword
 
-  # ─── Redis ─────────────────────────────────────────────────────────────────
+  # ─── Redis ───────────────────────────────────────────────────────────────────
   - type: redis
     name: commutepool-redis
     plan: free
     region: singapore
-    ipAllowList: []   # only internal access
+    ipAllowList: []   # internal access only
 
 # ─── PostgreSQL ──────────────────────────────────────────────────────────────
 databases:
