@@ -1,40 +1,32 @@
 # CommutePool Admin Portal
 
-Angular 17 dashboard — ops/compliance/support surface.
+Angular 17 operations portal for CommutePool admins.
 
 ## Stack
+- Angular 17 standalone components, signals-based state
+- Collapsible sidebar shell
+- Typed `AdminApiService` wired to `/api/admin/*` endpoints
 
-- Angular 17 + TypeScript
-- Angular Material (tables, forms, dialogs)
-- RxJS
-- ng2-charts (analytics charts)
-- Shared libs: `@commutepool/api-client`, `@commutepool/shared-models`, `@commutepool/auth`
+## Screens
 
-## Structure
-
-```
-admin/
-├── src/
-│   ├── app/
-│   │   ├── verification/  # Review DL / RC / Selfie queue
-│   │   ├── incidents/     # Safety incidents + SOS alerts
-│   │   ├── support/       # Support ticket queue + threaded view
-│   │   ├── corridors/     # Corridor management
-│   │   ├── pricing/       # Pricing policy per corridor
-│   │   ├── analytics/     # Trip metrics + funnel charts
-│   │   ├── audit/         # Admin audit log
-│   │   └── users/         # User list, profile, trust score
-│   └── environments/
-├── angular.json
-├── package.json
-└── tsconfig.json
-```
+| Screen | Path | What it does |
+|---|---|---|
+| Login | `/login` | Admin email + password → JWT |
+| Dashboard | `/dashboard` | KPI cards + user funnel bar chart |
+| Users | `/users` | Searchable + paginated list; suspend / unsuspend / set eligibility |
+| User Detail | `/users/:id` | Full profile + actions |
+| Offers | `/offers` | Filter by status; admin cancel |
+| Trips | `/trips` | Filter by status; force-complete / force-cancel |
+| Support Queue | `/support` | Filter by status; navigate to thread |
+| Ticket Detail | `/support/:id` | Message thread + admin reply + resolve + close |
+| Safety | `/safety` | SOS tab + Incidents tab; resolve per item |
+| Audit Log | `/audit` | Paginated; filter by entity type / admin |
+| Analytics | `/analytics` | Trip metrics KPIs, corridor stats table, funnel bars |
 
 ## Getting Started
 
 ```bash
+cd admin
 npm install
-ng serve
+npm start   # http://localhost:4201
 ```
-
-See `docs/setup/local-admin.md` for env config.
