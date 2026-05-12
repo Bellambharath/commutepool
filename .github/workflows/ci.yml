@@ -42,28 +42,34 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup .NET
+      - name: Setup .NET 8
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
 
-      - name: Restore
-        run: dotnet restore
+      - name: Restore NuGet packages
+        run: dotnet restore CommutePool.sln
         working-directory: backend
 
       - name: Build
-        run: dotnet build --no-restore --configuration Release
+        run: dotnet build CommutePool.sln --no-restore --configuration Release
         working-directory: backend
 
-      - name: Test
-        run: dotnet test --no-build --configuration Release --logger trx --results-directory TestResults
+      - name: Test (pass if no test projects yet)
+        run: |
+          TEST_PROJECTS=$(find . -name '*.Tests.csproj' -o -name '*.Test.csproj' 2>/dev/null | head -1)
+          if [ -z "$TEST_PROJECTS" ]; then
+            echo "::notice::No test projects found — skipping dotnet test"
+          else
+            dotnet test CommutePool.sln --no-build --configuration Release \
+              --logger trx --results-directory TestResults
+          fi
         working-directory: backend
         env:
           ConnectionStrings__DefaultConnection: Host=localhost;Port=5432;Database=commutepool_test;Username=cp;Password=cp
           Redis__ConnectionString: localhost:6379
           Jwt__Secret: test-secret-32-chars-minimum-here!
           Jwt__RefreshSecret: test-refresh-secret-32-chars!!
-        continue-on-error: true   # pass until unit tests are written
 
       - name: Log in to GHCR
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
@@ -84,7 +90,7 @@ jobs:
             ${{ env.IMAGE_PREFIX }}-api:${{ github.sha }}
 
   # ────────────────────────────────────────
-  # 2. Web PWA — Angular (scaffolded when ready)
+  # 2. Web PWA — Angular (skip if not scaffolded)
   # ────────────────────────────────────────
   pwa:
     name: Web PWA (Angular)
@@ -146,46 +152,47 @@ jobs:
             ${{ env.IMAGE_PREFIX }}-pwa:${{ github.sha }}
 
   # ────────────────────────────────────────
-  # 3. Admin Portal — Angular (scaffolded when ready)
+  # 3. Admin Portal — Next.js via pnpm (workspace:* dep)
   # ────────────────────────────────────────
   admin:
-    name: Admin Portal (Angular)
+    name: Admin Portal (Next.js)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Check if admin is scaffolded
-        id: check_admin
-        run: |
-          if [ -f admin/package.json ]; then
-            echo "exists=true" >> $GITHUB_OUTPUT
-          else
-            echo "exists=false" >> $GITHUB_OUTPUT
-            echo "::notice::admin/package.json not found — skipping Angular build until app is scaffolded"
-          fi
-
       - uses: actions/setup-node@v4
-        if: steps.check_admin.outputs.exists == 'true'
         with:
           node-version: '20'
 
-      - name: Install
-        if: steps.check_admin.outputs.exists == 'true'
-        run: npm install --legacy-peer-deps
-        working-directory: admin
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+          run_install: false
+
+      - name: Check if shared package exists
+        id: check_shared
+        run: |
+          if [ -f shared/package.json ]; then
+            echo "has_shared=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_shared=false" >> $GITHUB_OUTPUT
+            echo "::notice::shared/package.json not found — admin workspace dep will be mocked"
+          fi
+
+      - name: Install (pnpm workspace)
+        run: pnpm install --frozen-lockfile=false
+        env:
+          PNPM_IGNORE_SCRIPTS: true
 
       - name: Lint
-        if: steps.check_admin.outputs.exists == 'true'
-        run: npm run lint --if-present
-        working-directory: admin
+        run: pnpm --filter @commutepool/admin run lint --if-present
 
       - name: Build
-        if: steps.check_admin.outputs.exists == 'true'
-        run: npm run build -- --configuration production
-        working-directory: admin
+        run: pnpm --filter @commutepool/admin run build
 
       - name: Log in to GHCR
-        if: steps.check_admin.outputs.exists == 'true' && github.ref == 'refs/heads/main' && github.event_name == 'push'
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
@@ -193,7 +200,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build & push Admin image
-        if: steps.check_admin.outputs.exists == 'true' && github.ref == 'refs/heads/main' && github.event_name == 'push'
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         uses: docker/build-push-action@v5
         with:
           context: admin
