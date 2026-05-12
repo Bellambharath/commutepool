@@ -29,11 +29,11 @@ public sealed class SubmitRatingHandler(
         if (req.RaterUserId == req.RatedUserId)
             return Result<Guid>.Fail("SELF_RATING", "Cannot rate yourself.");
 
-        var duplicate = await db.TrustRatings.AnyAsync(
+        var duplicate = await db.Ratings.AnyAsync(
             r => r.TripId == req.TripId && r.RaterUserId == req.RaterUserId, ct);
         if (duplicate) return Result<Guid>.Fail("ALREADY_RATED", "You have already rated this trip.");
 
-        var rating = new TrustRatingEntity
+        var rating = new RatingEntity
         {
             Id = Guid.NewGuid(),
             TripId = req.TripId,
@@ -44,7 +44,7 @@ public sealed class SubmitRatingHandler(
             CreatedAt = DateTimeOffset.UtcNow
         };
 
-        db.TrustRatings.Add(rating);
+        db.Ratings.Add(rating);
         await db.SaveChangesAsync(ct);
 
         await mediator.Send(new RecomputeTrustScoreCommand(req.RatedUserId), ct);
@@ -57,7 +57,7 @@ public sealed class RecomputeTrustScoreHandler(
 {
     public async Task<Result<double>> Handle(RecomputeTrustScoreCommand req, CancellationToken ct)
     {
-        var ratings = await db.TrustRatings
+        var ratings = await db.Ratings
             .Where(r => r.RatedUserId == req.UserId)
             .ToListAsync(ct);
 
@@ -78,11 +78,24 @@ public sealed class RecomputeTrustScoreHandler(
 
         var score = Math.Round(Math.Min(weightedSum / totalWeight, 5.0), 2);
 
-        var user = await db.Users.FindAsync([req.UserId], ct);
-        if (user is not null)
+        var trustScore = await db.TrustScores.FirstOrDefaultAsync(s => s.UserId == req.UserId, ct);
+        if (trustScore is null)
         {
-            user.TrustScore = score;
-            user.UpdatedAt = DateTimeOffset.UtcNow;
+            trustScore = new TrustScoreEntity
+            {
+                Id = Guid.NewGuid(),
+                UserId = req.UserId,
+                Score = score,
+                TotalRatings = ratings.Count,
+                UpdatedAt = DateTimeOffset.UtcNow
+            };
+            db.TrustScores.Add(trustScore);
+        }
+        else
+        {
+            trustScore.Score = score;
+            trustScore.TotalRatings = ratings.Count;
+            trustScore.UpdatedAt = DateTimeOffset.UtcNow;
         }
 
         await db.SaveChangesAsync(ct);
@@ -95,16 +108,18 @@ public sealed class GetUserTrustScoreHandler(
 {
     public async Task<Result<TrustScoreDto>> Handle(GetUserTrustScoreQuery req, CancellationToken ct)
     {
-        var user = await db.Users.FindAsync([req.UserId], ct);
-        if (user is null) return Result<TrustScoreDto>.Fail("NOT_FOUND", "User not found.");
+        var trustScore = await db.TrustScores
+            .FirstOrDefaultAsync(s => s.UserId == req.UserId, ct);
 
-        var totalRatings = await db.TrustRatings.CountAsync(r => r.RatedUserId == req.UserId, ct);
+        var score = trustScore?.Score ?? 0.0;
+        var totalRatings = trustScore?.TotalRatings ?? 0;
+        var updatedAt = trustScore?.UpdatedAt;
 
         return Result<TrustScoreDto>.Ok(new TrustScoreDto(
             req.UserId,
-            user.TrustScore,
+            score,
             totalRatings,
-            user.UpdatedAt));
+            updatedAt));
     }
 }
 
@@ -113,7 +128,7 @@ public sealed class GetMyRatingsHandler(
 {
     public async Task<Result<List<RatingDto>>> Handle(GetMyRatingsQuery req, CancellationToken ct)
     {
-        var ratings = await db.TrustRatings
+        var ratings = await db.Ratings
             .Include(r => r.Rater)
             .Where(r => r.RatedUserId == req.UserId)
             .OrderByDescending(r => r.CreatedAt)
