@@ -8,8 +8,8 @@ public sealed class CorridorEntity
 {
     public Guid Id { get; set; }
     public string Name { get; set; } = string.Empty;
-    public string Slug { get; set; } = string.Empty;       // e.g. "hyd-gachibowli"
-    public string City { get; set; } = string.Empty;       // e.g. "Hyderabad"
+    public string Slug { get; set; } = string.Empty;
+    public string City { get; set; } = string.Empty;
     public double CenterLat { get; set; }
     public double CenterLng { get; set; }
     public double RadiusKm { get; set; } = 5.0;
@@ -65,7 +65,7 @@ public sealed class CommuteProfileEntity
     public Guid UserId { get; set; }
     public Guid CorridorId { get; set; }
 
-    // Flat geo fields (used by CommuteHandlers + PickupHandlers indirect)
+    // Geo fields
     public string HomeArea { get; set; } = string.Empty;
     public double HomeLat { get; set; }
     public double HomeLng { get; set; }
@@ -73,22 +73,22 @@ public sealed class CommuteProfileEntity
     public double OfficeLat { get; set; }
     public double OfficeLng { get; set; }
 
-    // JSON geo strings (used by PickupHandlers - ParseGeo helper)
-    // Computed/stored in sync with HomeLat/HomeLng
-    public string? HomeGeo { get; set; }    // JSON: {"lat":17.4,"lng":78.5}
-    public string? OfficeGeo { get; set; }  // JSON: {"lat":17.4,"lng":78.5}
+    // JSON geo strings (used by PickupHandlers)
+    public string? HomeGeo { get; set; }
+    public string? OfficeGeo { get; set; }
 
-    // Schedule: single departure times (used by CommuteHandlers)
+    // Schedule
     public TimeOnly MorningDepartureTime { get; set; }
     public TimeOnly EveningDepartureTime { get; set; }
 
-    // Window ranges (used by MatchingHandlers for overlap scoring)
+    // Window ranges (used by MatchingHandlers)
     public TimeOnly MorningWindowStart { get; set; }
     public TimeOnly MorningWindowEnd { get; set; }
     public TimeOnly EveningWindowStart { get; set; }
     public TimeOnly EveningWindowEnd { get; set; }
 
-    public int[] ActiveDays { get; set; } = [];   // 0=Sun ... 6=Sat
+    // ActiveDays as List<string> (e.g. ["MON","TUE"]) — matches CommuteHandlers + CommuteProfileDto
+    public List<string> ActiveDays { get; set; } = [];
     public bool Paused { get; set; } = false;
 
     public DateTimeOffset CreatedAt { get; set; }

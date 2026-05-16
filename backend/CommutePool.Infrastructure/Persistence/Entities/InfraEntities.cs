@@ -31,6 +31,18 @@ public sealed class AuditLogEntity
     public DateTimeOffset CreatedAt { get; set; }
 }
 
+[Table("admin_audit_logs")]
+public sealed class AdminAuditLogEntity
+{
+    public Guid Id { get; set; }
+    public Guid AdminUserId { get; set; }
+    public string Action { get; set; } = string.Empty;
+    public string? EntityType { get; set; }
+    public Guid? EntityId { get; set; }
+    public string? Note { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
+}
+
 [Table("notifications")]
 public sealed class NotificationEntity
 {
@@ -62,11 +74,14 @@ public sealed class PricingPolicyEntity
     public Guid Id { get; set; }
     public Guid? CorridorId { get; set; }
     public string Label { get; set; } = string.Empty;
-    public decimal BaseContribution { get; set; }
-    public decimal? MaxContribution { get; set; }
+    public decimal BaseContribution { get; set; }    // maps to MaxContributionPerKm in DTO
+    public decimal? MaxContribution { get; set; }    // maps to MaxDailyContribution in DTO
     public decimal DetourPricePerMin { get; set; }
     public bool Active { get; set; }
     public DateOnly? EffectiveFrom { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
+
+    // Navigation property (used by PricingHandlers via .Include(p => p.Corridor))
+    public CorridorEntity? Corridor { get; set; }
 }

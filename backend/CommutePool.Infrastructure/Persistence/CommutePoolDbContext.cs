@@ -53,6 +53,7 @@ public sealed class CommutePoolDbContext(DbContextOptions<CommutePoolDbContext> 
     public DbSet<PushTokenEntity> PushTokens => Set<PushTokenEntity>();
     public DbSet<OutboxEventEntity> OutboxEvents => Set<OutboxEventEntity>();
     public DbSet<AuditLogEntity> AuditLogs => Set<AuditLogEntity>();
+    public DbSet<AdminAuditLogEntity> AdminAuditLogs => Set<AdminAuditLogEntity>();
     public DbSet<PricingPolicyEntity> PricingPolicies => Set<PricingPolicyEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

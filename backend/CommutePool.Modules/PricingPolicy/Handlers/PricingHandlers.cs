@@ -27,9 +27,12 @@ public sealed class UpsertPricingPolicyHandler(
             {
                 Id = Guid.NewGuid(),
                 CorridorId = corridor.Id,
-                MaxContributionPerKm = req.MaxContribution,
-                MaxDailyContribution = req.BaseContribution,
+                Label = req.Label,
+                BaseContribution = req.BaseContribution,   // MaxContributionPerKm in DTO
+                MaxContribution = req.MaxContribution,     // MaxDailyContribution in DTO
+                DetourPricePerMin = req.DetourPricePerMin,
                 Active = req.Active,
+                EffectiveFrom = req.EffectiveFrom,
                 CreatedAt = DateTimeOffset.UtcNow,
                 UpdatedAt = DateTimeOffset.UtcNow
             };
@@ -37,9 +40,12 @@ public sealed class UpsertPricingPolicyHandler(
         }
         else
         {
-            policy.MaxContributionPerKm = req.MaxContribution;
-            policy.MaxDailyContribution = req.BaseContribution;
+            policy.Label = req.Label;
+            policy.BaseContribution = req.BaseContribution;
+            policy.MaxContribution = req.MaxContribution;
+            policy.DetourPricePerMin = req.DetourPricePerMin;
             policy.Active = req.Active;
+            policy.EffectiveFrom = req.EffectiveFrom;
             policy.UpdatedAt = DateTimeOffset.UtcNow;
         }
 
@@ -55,9 +61,16 @@ public sealed class GetPricingPolicyHandler(
     {
         var p = await db.PricingPolicies
             .Include(x => x.Corridor)
-            .FirstOrDefaultAsync(x => x.Corridor.Slug == req.CorridorSlug && x.Active, ct);
+            .FirstOrDefaultAsync(x => x.Corridor != null && x.Corridor.Slug == req.CorridorSlug && x.Active, ct);
 
-        return Result<PricingPolicyDto?>.Ok(p is null ? null : new PricingPolicyDto(
-            p.Id, p.Corridor.Slug, p.MaxContributionPerKm, p.MaxDailyContribution, p.Active, p.UpdatedAt));
+        if (p is null) return Result<PricingPolicyDto?>.Ok(null);
+
+        return Result<PricingPolicyDto?>.Ok(new PricingPolicyDto(
+            p.Id,
+            p.Corridor!.Slug,
+            p.BaseContribution,           // -> MaxContributionPerKm
+            p.MaxContribution ?? 0m,      // -> MaxDailyContribution
+            p.Active,
+            p.UpdatedAt));
     }
 }
