@@ -1,19 +1,17 @@
-# CommutePool PWA — Netlify deployment config (pwa subfolder copy)
+# CommutePool — Netlify deployment config (pwa subfolder copy)
 
 [build]
-  command   = "pnpm --filter pwa exec ng build --configuration production"
-  publish   = "dist/pwa/browser"
+  command   = "pnpm --filter @commutepool/web build"
+  publish   = "web/.next"
 
 [build.environment]
   NODE_VERSION = "20"
 
-# SPA fallback — all routes go to index.html
 [[redirects]]
   from   = "/*"
   to     = "/index.html"
   status = 200
 
-# Proxy /api/* → Render backend (no CORS issues)
 [[redirects]]
   from   = "/api/*"
   to     = "https://commutepool-api.onrender.com/api/:splat"
@@ -26,8 +24,3 @@
     X-Frame-Options        = "DENY"
     X-Content-Type-Options = "nosniff"
     Referrer-Policy        = "strict-origin-when-cross-origin"
-
-[[headers]]
-  for = "/ngsw.json"
-  [headers.values]
-    Cache-Control = "no-cache"
