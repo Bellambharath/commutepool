@@ -63,19 +63,26 @@ public sealed class CommuteProfileEntity
     public Guid Id { get; set; }
     public Guid UserId { get; set; }
     public Guid CorridorId { get; set; }
-    public string? Label { get; set; }
-    public string HomeZoneLabel { get; set; } = string.Empty;
-    public string OfficeZoneLabel { get; set; } = string.Empty;
-    public string? HomeGeo { get; set; }    // JSON {lat,lng}
-    public string? OfficeGeo { get; set; }  // JSON {lat,lng}
-    public int[] WorkingDays { get; set; } = [];
-    public TimeOnly MorningWindowStart { get; set; }
-    public TimeOnly MorningWindowEnd { get; set; }
-    public TimeOnly EveningWindowStart { get; set; }
-    public TimeOnly EveningWindowEnd { get; set; }
-    public bool Active { get; set; } = true;
+
+    // Home location
+    public string HomeArea { get; set; } = string.Empty;
+    public double HomeLat { get; set; }
+    public double HomeLng { get; set; }
+
+    // Office location
+    public string OfficeArea { get; set; } = string.Empty;
+    public double OfficeLat { get; set; }
+    public double OfficeLng { get; set; }
+
+    // Schedule
+    public TimeOnly MorningDepartureTime { get; set; }
+    public TimeOnly EveningDepartureTime { get; set; }
+    public int[] ActiveDays { get; set; } = [];   // 0=Sun … 6=Sat
+
+    public bool Paused { get; set; } = false;
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
+
     public UserEntity User { get; set; } = null!;
     public CorridorEntity Corridor { get; set; } = null!;
 }
