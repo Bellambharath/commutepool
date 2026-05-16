@@ -1,7 +1,7 @@
 # CommutePool PWA — Netlify deployment config (pwa subfolder copy)
 
 [build]
-  command   = "npm install -g pnpm && pnpm install && pnpm --filter pwa exec ng build --configuration production"
+  command   = "pnpm --filter pwa exec ng build --configuration production"
   publish   = "dist/pwa/browser"
 
 [build.environment]
