@@ -3,7 +3,7 @@
 
 [build]
   base      = "pwa"
-  command   = "npm install && npx ng build --configuration production"
+  command   = "cd .. && npm install && cd pwa && ../node_modules/.bin/ng build --configuration production"
   publish   = "dist/pwa/browser"
 
 [build.environment]
