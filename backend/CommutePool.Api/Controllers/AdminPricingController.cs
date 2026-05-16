@@ -26,12 +26,21 @@ public sealed class AdminPricingController(IMediator mediator) : ControllerBase
     public async Task<IActionResult> Upsert(string corridorSlug, [FromBody] UpsertPricingRequest body)
     {
         var result = await mediator.Send(new UpsertPricingPolicyCommand(
-            UserId, corridorSlug, body.MaxContributionPerKm, body.MaxDailyContribution, body.Active));
+            UserId,
+            corridorSlug,
+            corridorSlug,
+            body.MaxContributionPerKm,
+            body.MaxDailyContribution,
+            body.DetourPricePerMin,
+            body.Active,
+            body.EffectiveFrom));
         return result.IsSuccess ? Ok(new { policyId = result.Value }) : BadRequest(result.Error);
     }
 
     public sealed record UpsertPricingRequest(
         decimal MaxContributionPerKm,
         decimal MaxDailyContribution,
-        bool Active);
+        decimal DetourPricePerMin,
+        bool Active,
+        DateOnly EffectiveFrom);
 }

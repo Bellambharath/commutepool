@@ -22,14 +22,14 @@ public sealed class UsersController(IMediator mediator) : ControllerBase
     public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileCommand command)
     {
         var result = await mediator.Send(command with { UserId = UserId });
-        return result.IsSuccess ? Ok(result.Value) : BadRequest(result.Error);
+        return result.IsSuccess ? NoContent() : BadRequest(result.Error);
     }
 
     [HttpPut("me/emergency-contact")]
     public async Task<IActionResult> UpdateEmergencyContact([FromBody] UpdateEmergencyContactCommand command)
     {
         var result = await mediator.Send(command with { UserId = UserId });
-        return result.IsSuccess ? Ok(result.Value) : BadRequest(result.Error);
+        return result.IsSuccess ? NoContent() : BadRequest(result.Error);
     }
 
     private Guid UserId =>

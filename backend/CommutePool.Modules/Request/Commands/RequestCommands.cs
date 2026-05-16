@@ -19,3 +19,16 @@ public sealed record ResumeRideRequestCommand(
 public sealed record CloseRideRequestCommand(
     Guid RequestId,
     Guid RiderId) : IRequest<Result>;
+
+public sealed record WithdrawRideRequestCommand(
+    Guid RiderId,
+    Guid RequestId) : IRequest<Result>;
+
+public sealed record AcceptRideRequestCommand(
+    Guid DriverId,
+    Guid RequestId) : IRequest<Result>;
+
+public sealed record DeclineRideRequestCommand(
+    Guid DriverId,
+    Guid RequestId,
+    string Reason) : IRequest<Result>;

@@ -18,7 +18,7 @@ public sealed class AdminSafetyController(IMediator mediator) : ControllerBase
     [HttpGet("incidents")]
     public async Task<IActionResult> GetAll([FromQuery] int page = 1, [FromQuery] int pageSize = 20, [FromQuery] string? status = null)
     {
-        var result = await mediator.Send(new GetAllIncidentsAdminQuery(page, pageSize, status));
+        var result = await mediator.Send(new GetAllIncidentsAdminQuery(status, page, pageSize));
         return result.IsSuccess ? Ok(result.Value) : BadRequest(result.Error);
     }
 

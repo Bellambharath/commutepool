@@ -1,6 +1,5 @@
 using CommutePool.Modules.Offer.Commands;
 using CommutePool.Modules.Offer.Queries;
-using CommutePool.Shared.Enums;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -31,11 +30,9 @@ public sealed class OfferController(IMediator mediator) : ControllerBase
     }
 
     [HttpGet("available")]
-    public async Task<IActionResult> GetAvailable(
-        [FromQuery] Guid corridorId,
-        [FromQuery] DateOnly date)
+    public async Task<IActionResult> GetAvailable()
     {
-        var result = await mediator.Send(new GetAvailableOffersForRiderQuery(UserId, corridorId, date));
+        var result = await mediator.Send(new GetAvailableOffersForRiderQuery(UserId));
         return result.IsSuccess ? Ok(result.Value) : BadRequest(result.Error);
     }
 
