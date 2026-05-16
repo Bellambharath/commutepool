@@ -1,8 +1,10 @@
 using CommutePool.Api.Middleware;
 using CommutePool.Infrastructure;
+using CommutePool.Infrastructure.Persistence;
 using CommutePool.Modules;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
 using System.Text;
@@ -67,6 +69,25 @@ builder.Services.AddCors(options =>
               .AllowAnyMethod()));
 
 var app = builder.Build();
+
+// ── Auto-apply EF Core migrations on startup ─────────────────────────────────
+// This creates all tables (including outbox_events) on a fresh database.
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<CommutePoolDbContext>();
+    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+    try
+    {
+        logger.LogInformation("Applying EF Core migrations...");
+        await db.Database.MigrateAsync();
+        logger.LogInformation("Migrations applied successfully.");
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "An error occurred while applying migrations.");
+        throw;
+    }
+}
 
 // ── Middleware pipeline ───────────────────────────────────────────────────────
 app.UseSerilogRequestLogging();
