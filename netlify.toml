@@ -1,9 +1,8 @@
 # CommutePool PWA — Netlify deployment config
 
 [build]
-  base      = "pwa"
-  command   = "cd .. && npm install && cd pwa && ../node_modules/.bin/ng build --configuration production"
-  publish   = "dist/pwa/browser"
+  command   = "npm install -g pnpm && pnpm install && pnpm --filter pwa exec ng build --configuration production"
+  publish   = "pwa/dist/pwa/browser"
 
 [build.environment]
   NODE_VERSION = "20"

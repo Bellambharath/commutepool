@@ -1,9 +1,7 @@
-# CommutePool PWA — Netlify deployment config
-# Site URL: app.pghive.in
+# CommutePool PWA — Netlify deployment config (pwa subfolder copy)
 
 [build]
-  base      = "pwa"
-  command   = "cd .. && npm install && cd pwa && ../node_modules/.bin/ng build --configuration production"
+  command   = "npm install -g pnpm && pnpm install && pnpm --filter pwa exec ng build --configuration production"
   publish   = "dist/pwa/browser"
 
 [build.environment]
