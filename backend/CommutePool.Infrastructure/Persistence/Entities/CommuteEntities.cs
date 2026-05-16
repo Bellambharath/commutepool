@@ -8,10 +8,11 @@ public sealed class CorridorEntity
 {
     public Guid Id { get; set; }
     public string Name { get; set; } = string.Empty;
-    public string OriginLabel { get; set; } = string.Empty;
-    public string DestinationLabel { get; set; } = string.Empty;
-    public string? OriginGeo { get; set; }
-    public string? DestinationGeo { get; set; }
+    public string Slug { get; set; } = string.Empty;       // e.g. "hyd-gachibowli"
+    public string City { get; set; } = string.Empty;       // e.g. "Hyderabad"
+    public double CenterLat { get; set; }
+    public double CenterLng { get; set; }
+    public double RadiusKm { get; set; } = 5.0;
     public int MaxDetourMinutes { get; set; } = 10;
     public bool ExactPickupEnabled { get; set; } = false;
     public bool Active { get; set; } = false;
@@ -64,22 +65,32 @@ public sealed class CommuteProfileEntity
     public Guid UserId { get; set; }
     public Guid CorridorId { get; set; }
 
-    // Home location
+    // Flat geo fields (used by CommuteHandlers + PickupHandlers indirect)
     public string HomeArea { get; set; } = string.Empty;
     public double HomeLat { get; set; }
     public double HomeLng { get; set; }
-
-    // Office location
     public string OfficeArea { get; set; } = string.Empty;
     public double OfficeLat { get; set; }
     public double OfficeLng { get; set; }
 
-    // Schedule
+    // JSON geo strings (used by PickupHandlers - ParseGeo helper)
+    // Computed/stored in sync with HomeLat/HomeLng
+    public string? HomeGeo { get; set; }    // JSON: {"lat":17.4,"lng":78.5}
+    public string? OfficeGeo { get; set; }  // JSON: {"lat":17.4,"lng":78.5}
+
+    // Schedule: single departure times (used by CommuteHandlers)
     public TimeOnly MorningDepartureTime { get; set; }
     public TimeOnly EveningDepartureTime { get; set; }
-    public int[] ActiveDays { get; set; } = [];   // 0=Sun … 6=Sat
 
+    // Window ranges (used by MatchingHandlers for overlap scoring)
+    public TimeOnly MorningWindowStart { get; set; }
+    public TimeOnly MorningWindowEnd { get; set; }
+    public TimeOnly EveningWindowStart { get; set; }
+    public TimeOnly EveningWindowEnd { get; set; }
+
+    public int[] ActiveDays { get; set; } = [];   // 0=Sun ... 6=Sat
     public bool Paused { get; set; } = false;
+
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
 

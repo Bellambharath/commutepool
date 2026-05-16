@@ -38,6 +38,9 @@ public sealed class UserCompanyMembershipEntity
     public bool Verified { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
+
+    // Navigation property (used by CompanyHandlers via .Include(m => m.Company))
+    public CompanyEntity Company { get; set; } = null!;
 }
 
 [Table("verification_cases")]

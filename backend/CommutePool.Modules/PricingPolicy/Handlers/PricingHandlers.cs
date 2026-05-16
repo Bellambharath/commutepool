@@ -13,21 +13,23 @@ public sealed class UpsertPricingPolicyHandler(
 {
     public async Task<Result<Guid>> Handle(UpsertPricingPolicyCommand req, CancellationToken ct)
     {
+        var corridor = await db.Corridors
+            .FirstOrDefaultAsync(c => c.Slug == req.CorridorSlug, ct);
+        if (corridor is null)
+            return Result<Guid>.Fail("INVALID_CORRIDOR", "Corridor not found.");
+
         var policy = await db.PricingPolicies
-            .FirstOrDefaultAsync(p => p.CorridorId == req.CorridorId, ct);
+            .FirstOrDefaultAsync(p => p.CorridorId == corridor.Id, ct);
 
         if (policy is null)
         {
             policy = new PricingPolicyEntity
             {
                 Id = Guid.NewGuid(),
-                CorridorId = req.CorridorId,
-                Label = req.Label,
-                BaseContribution = req.BaseContribution,
-                MaxContribution = req.MaxContribution,
-                DetourPricePerMin = req.DetourPricePerMin,
+                CorridorId = corridor.Id,
+                MaxContributionPerKm = req.MaxContribution,
+                MaxDailyContribution = req.BaseContribution,
                 Active = req.Active,
-                EffectiveFrom = req.EffectiveFrom,
                 CreatedAt = DateTimeOffset.UtcNow,
                 UpdatedAt = DateTimeOffset.UtcNow
             };
@@ -35,12 +37,9 @@ public sealed class UpsertPricingPolicyHandler(
         }
         else
         {
-            policy.Label = req.Label;
-            policy.BaseContribution = req.BaseContribution;
-            policy.MaxContribution = req.MaxContribution;
-            policy.DetourPricePerMin = req.DetourPricePerMin;
+            policy.MaxContributionPerKm = req.MaxContribution;
+            policy.MaxDailyContribution = req.BaseContribution;
             policy.Active = req.Active;
-            policy.EffectiveFrom = req.EffectiveFrom;
             policy.UpdatedAt = DateTimeOffset.UtcNow;
         }
 
@@ -55,11 +54,10 @@ public sealed class GetPricingPolicyHandler(
     public async Task<Result<PricingPolicyDto?>> Handle(GetPricingPolicyQuery req, CancellationToken ct)
     {
         var p = await db.PricingPolicies
-            .FirstOrDefaultAsync(x => x.CorridorId == req.CorridorId && x.Active, ct);
+            .Include(x => x.Corridor)
+            .FirstOrDefaultAsync(x => x.Corridor.Slug == req.CorridorSlug && x.Active, ct);
 
         return Result<PricingPolicyDto?>.Ok(p is null ? null : new PricingPolicyDto(
-            p.Id, p.CorridorId, p.Label,
-            p.BaseContribution, p.MaxContribution,
-            p.DetourPricePerMin, p.Active, p.EffectiveFrom, p.UpdatedAt));
+            p.Id, p.Corridor.Slug, p.MaxContributionPerKm, p.MaxDailyContribution, p.Active, p.UpdatedAt));
     }
 }

@@ -108,15 +108,22 @@ public sealed class GetMyRideRequestsHandler(
 {
     public async Task<Result<List<RideRequestDto>>> Handle(GetMyRideRequestsQuery req, CancellationToken ct)
     {
+        // RideRequestDto shape: (Id, OfferId, RiderId, RiderName, Status, Note, DeclineReason, CreatedAt)
+        // RideRequestEntity has no OfferId/RiderName/Note/DeclineReason — use Guid.Empty/empty string as stubs
         var list = await db.RideRequests
             .Where(r => r.RiderId == req.RiderId)
             .OrderByDescending(r => r.CreatedAt)
             .Skip((req.Page - 1) * req.PageSize)
             .Take(req.PageSize)
             .Select(r => new RideRequestDto(
-                r.Id, r.RiderId, r.CommuteProfileId, r.CorridorId,
-                r.PickupModePref.ToString(), r.Status.ToString(),
-                r.CreatedAt, r.UpdatedAt))
+                r.Id,
+                Guid.Empty,          // OfferId — not stored on entity; stub
+                r.RiderId,
+                string.Empty,        // RiderName — not joined here; stub
+                r.Status.ToString(),
+                null,                // Note
+                null,                // DeclineReason
+                r.CreatedAt))
             .ToListAsync(ct);
         return Result<List<RideRequestDto>>.Ok(list);
     }
