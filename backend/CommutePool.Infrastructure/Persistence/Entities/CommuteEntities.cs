@@ -3,6 +3,45 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace CommutePool.Infrastructure.Persistence.Entities;
 
+[Table("corridors")]
+public sealed class CorridorEntity
+{
+    public Guid Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string OriginLabel { get; set; } = string.Empty;
+    public string DestinationLabel { get; set; } = string.Empty;
+    public string? OriginGeo { get; set; }
+    public string? DestinationGeo { get; set; }
+    public int MaxDetourMinutes { get; set; } = 10;
+    public bool ExactPickupEnabled { get; set; } = false;
+    public bool Active { get; set; } = false;
+    public string? OperationalNotes { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
+    public DateTimeOffset UpdatedAt { get; set; }
+}
+
+[Table("corridor_company_restrictions")]
+public sealed class CorridorCompanyRestrictionEntity
+{
+    public Guid Id { get; set; }
+    public Guid CorridorId { get; set; }
+    public Guid CompanyId { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
+}
+
+[Table("recurring_pairs")]
+public sealed class RecurringPairEntity
+{
+    public Guid Id { get; set; }
+    public Guid MatchId { get; set; }
+    public Guid OwnerId { get; set; }
+    public Guid RiderId { get; set; }
+    public Guid CorridorId { get; set; }
+    public RecurringPairStatus Status { get; set; } = RecurringPairStatus.Active;
+    public DateTimeOffset CreatedAt { get; set; }
+    public DateTimeOffset UpdatedAt { get; set; }
+}
+
 [Table("vehicles")]
 public sealed class VehicleEntity
 {
