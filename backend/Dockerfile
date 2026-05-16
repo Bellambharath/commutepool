@@ -1,4 +1,4 @@
-# ── Build stage ──────────────────────────────────────────────────────────────
+# ── Build stage ────────────────────────────────────────────────────────────────────────────
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 
@@ -17,15 +17,17 @@ COPY . .
 RUN dotnet publish CommutePool.Api/CommutePool.Api.csproj \
     -c Release -o /app/publish --no-restore
 
-# ── Runtime stage ─────────────────────────────────────────────────────────────
+# ── Runtime stage ─────────────────────────────────────────────────────────────────────────────
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
 WORKDIR /app
 
 COPY --from=build /app/publish .
 
-# Render injects PORT env var; ASP.NET Core reads ASPNETCORE_URLS
-ENV ASPNETCORE_URLS=http://+:${PORT:-10000}
+# Do NOT hardcode ASPNETCORE_URLS here.
+# Render injects PORT=3000 at runtime; ASP.NET Core automatically reads it
+# via the HTTP_PORTS env var (ASP.NET 8+) so no manual wiring is needed.
+# If you must set a fallback, use the ENTRYPOINT with an env shim instead.
 
-EXPOSE 10000
+EXPOSE 3000
 
 ENTRYPOINT ["dotnet", "CommutePool.Api.dll"]
