@@ -7,12 +7,9 @@
 [build.environment]
   NODE_VERSION = "20"
 
-# Next.js on Netlify handles routing via the Next.js plugin
-# SPA fallback for static export (remove if using SSR)
-[[redirects]]
-  from   = "/*"
-  to     = "/index.html"
-  status = 200
+# Required for Next.js SSR, image optimization, and routing on Netlify
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
 
 # Proxy /api/* → Render backend
 [[redirects]]
