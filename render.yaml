@@ -10,3 +10,5 @@ services:
         sync: false
       - key: ConnectionStrings__DefaultConnection
         sync: false
+      - key: ASPNETCORE_URLS
+        value: http://+:3000
