@@ -12,7 +12,31 @@ public sealed class OutboxWorker(
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        logger.LogInformation("Outbox worker started.");
+        logger.LogInformation("Outbox worker started — waiting for database to be ready...");
+
+        // Wait until the outbox_events table exists (i.e. migrations have run).
+        // Retries every 5 seconds for up to 2 minutes before giving up.
+        const int maxAttempts = 24;
+        for (int attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            try
+            {
+                using var checkScope = scopeFactory.CreateScope();
+                var checkDb = checkScope.ServiceProvider.GetRequiredService<CommutePoolDbContext>();
+                // A lightweight probe — if the table doesn't exist this throws 42P01.
+                _ = await checkDb.OutboxEvents.AnyAsync(stoppingToken);
+                logger.LogInformation("Outbox worker: database ready after {Attempt} attempt(s).", attempt);
+                break;
+            }
+            catch (Exception ex) when (attempt < maxAttempts)
+            {
+                logger.LogWarning("Outbox worker: DB not ready yet (attempt {Attempt}/{Max}): {Msg}. Retrying in 5s...",
+                    attempt, maxAttempts, ex.Message);
+                await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
+            }
+        }
+
+        logger.LogInformation("Outbox worker processing loop starting.");
 
         while (!stoppingToken.IsCancellationRequested)
         {
