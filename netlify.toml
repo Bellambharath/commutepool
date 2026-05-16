@@ -1,9 +1,8 @@
 # CommutePool PWA — Netlify deployment config
-# Site URL: app.pghive.in
 
 [build]
   base      = "pwa"
-  command   = "npm ci && npm run build -- --configuration production"
+  command   = "npm install && npx ng build --configuration production"
   publish   = "dist/pwa/browser"
 
 [build.environment]
