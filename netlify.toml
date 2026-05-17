@@ -1,20 +1,17 @@
-# CommutePool — Netlify deployment config (Angular PWA)
+# CommutePool — Netlify deployment config (Next.js web app)
 
 [build]
-  base    = "pwa"
-  command = "npm install && npx ng build --configuration production"
-  publish = "pwa/dist/pwa/browser"
+  command = "pnpm --filter @commutepool/web build"
+  publish = "web/.next"
 
 [build.environment]
   NODE_VERSION = "20"
 
-# SPA fallback — all routes served by Angular router
-[[redirects]]
-  from   = "/*"
-  to     = "/index.html"
-  status = 200
+# Required for Next.js SSR, image optimization, and routing on Netlify
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
 
-# API proxy → Render backend
+# Proxy /api/* → Render backend
 [[redirects]]
   from   = "/api/*"
   to     = "https://commutepool-api.onrender.com/api/:splat"
@@ -27,14 +24,3 @@
     X-Frame-Options        = "DENY"
     X-Content-Type-Options = "nosniff"
     Referrer-Policy        = "strict-origin-when-cross-origin"
-    Cache-Control          = "public, max-age=0, must-revalidate"
-
-[[headers]]
-  for = "/assets/*"
-  [headers.values]
-    Cache-Control = "public, max-age=31536000, immutable"
-
-[[headers]]
-  for = "/ngsw.json"
-  [headers.values]
-    Cache-Control = "no-cache"
