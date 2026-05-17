@@ -13,6 +13,11 @@
   "devDependencies": {
     "turbo": "^2.0.0"
   },
+  "pnpm": {
+    "overrides": {
+      "styled-jsx": "5.1.1"
+    }
+  },
   "packageManager": "pnpm@9.0.0",
   "engines": {
     "node": ">=20.0.0"
