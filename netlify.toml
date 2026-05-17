@@ -1,14 +1,13 @@
 # CommutePool — Netlify deployment config (Angular PWA)
-# base = repo root so pnpm can read pnpm-lock.yaml correctly
+# pwa/ is a standalone Angular app, NOT in the pnpm workspace (web/admin/shared only)
 
 [build]
-  base    = "/"
-  command = "pnpm install --filter pwa... && cd pwa && npx ng build --configuration production"
-  publish = "pwa/dist/pwa/browser"
+  base    = "pwa"
+  command = "npm install --legacy-peer-deps && npx ng build --configuration production"
+  publish = "dist/pwa/browser"
 
 [build.environment]
-  NODE_VERSION  = "20"
-  PNPM_VERSION  = "9"
+  NODE_VERSION = "20"
 
 # SPA fallback — all routes served by Angular router
 [[redirects]]
