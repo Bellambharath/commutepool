@@ -1,17 +1,15 @@
-# CommutePool — Netlify deployment config (Next.js web app)
-
 [build]
-  command = "pnpm --filter @commutepool/web build"
-  publish = "web/.next"
+  base    = "web"
+  command = "npm install --legacy-peer-deps && npm run build"
+  publish = ".next"
 
 [build.environment]
   NODE_VERSION = "20"
+  NPM_FLAGS    = "--legacy-peer-deps"
 
-# Required for Next.js SSR, image optimization, and routing on Netlify
 [[plugins]]
   package = "@netlify/plugin-nextjs"
 
-# Proxy /api/* → Render backend
 [[redirects]]
   from   = "/api/*"
   to     = "https://commutepool-api.onrender.com/api/:splat"
