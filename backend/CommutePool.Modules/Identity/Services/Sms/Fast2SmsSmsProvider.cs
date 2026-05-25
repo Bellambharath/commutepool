@@ -31,20 +31,22 @@ public sealed class Fast2SmsSmsProvider(
 
         var mobile = toPhone.Replace("+91", "").Replace(" ", "");
 
+        // Fast2SMS requires the API key as an HTTP header named "authorization"
+        // NOT inside the JSON body — https://docs.fast2sms.com
         var payload = new
         {
-            authorization = apiKey,
-            route         = route,
-            message       = message,
-            language      = "english",
-            flash         = 0,
-            numbers       = mobile
+            route    = route,
+            message  = message,
+            language = "english",
+            flash    = 0,
+            numbers  = mobile
         };
 
         var request = new HttpRequestMessage(HttpMethod.Post, BaseUrl)
         {
             Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json")
         };
+        request.Headers.Add("authorization", apiKey);
 
         var response = await _http.SendAsync(request, ct);
         var body     = await response.Content.ReadAsStringAsync(ct);
