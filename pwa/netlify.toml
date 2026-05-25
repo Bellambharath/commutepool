@@ -1,17 +1,27 @@
-# CommutePool — Netlify deployment config for Angular PWA
+# pwa/netlify.toml
+# Netlify sets base=pwa in the UI, so this file is picked up.
+# The Angular source lives at the REPO ROOT (angular.json, package.json are at root level).
+# We go up one level to build from the actual Angular workspace.
 
 [build]
-  command = "npm install && npx ng build --configuration production"
-  publish = "dist/pwa/browser"
+  command = "cd .. && npm install --legacy-peer-deps && npx ng build --configuration production"
+  publish = "../dist/pwa/browser"
 
 [build.environment]
   NODE_VERSION = "20"
 
-# SPA fallback — required for Angular client-side routing
+# SPA fallback
 [[redirects]]
   from   = "/*"
   to     = "/index.html"
   status = 200
+
+# API proxy
+[[redirects]]
+  from   = "/api/*"
+  to     = "https://commutepool-api.onrender.com/api/:splat"
+  status = 200
+  force  = true
 
 [[headers]]
   for = "/*"
@@ -25,3 +35,8 @@
   for = "/assets/*"
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/ngsw.json"
+  [headers.values]
+    Cache-Control = "no-cache"
