@@ -1,14 +1,13 @@
-# NOTE: This file exists only because Netlify UI has base=pwa set.
-# The actual app is Next.js in web/ — this config builds from repo root.
+# Netlify config — base is locked to pwa/ in the UI
+# Build runs from repo root via cd .., output lands in ../web/.next
 
 [build]
-  base    = "/"
-  command = "pnpm install && pnpm --filter @commutepool/web build"
-  publish = "web/.next"
+  command = "cd /opt/build/repo && pnpm install && pnpm --filter @commutepool/web build"
+  publish = "../web/.next"
 
 [build.environment]
-  NODE_VERSION   = "20"
-  PNPM_VERSION   = "9"
+  NODE_VERSION = "20"
+  PNPM_VERSION = "9"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
