@@ -1,5 +1,5 @@
 # Netlify config — base is locked to pwa/ in the UI
-# Build runs from repo root via cd .., output lands in ../web/.next
+# Build runs from repo root via absolute path, output lands in ../web/.next
 
 [build]
   command = "cd /opt/build/repo && pnpm install && pnpm --filter @commutepool/web build"
@@ -12,16 +12,12 @@
 [[plugins]]
   package = "@netlify/plugin-nextjs"
 
+# Only proxy /api/* to backend — let the Next.js plugin handle everything else
 [[redirects]]
   from   = "/api/*"
   to     = "https://commutepool-api.onrender.com/api/:splat"
   status = 200
   force  = true
-
-[[redirects]]
-  from   = "/*"
-  to     = "/.netlify/functions/___netlify-handler"
-  status = 200
 
 [[headers]]
   for = "/*"
