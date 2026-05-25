@@ -15,6 +15,7 @@ public static class IdentityModuleExtensions
         services.AddSingleton<ISmsProvider, ConsoleSmsProvider>();
         services.AddSingleton<ISmsProvider, Msg91SmsProvider>();
         services.AddSingleton<ISmsProvider, Fast2SmsSmsProvider>();
+        services.AddSingleton<ISmsProvider, TwilioSmsProvider>();
 
         // Factory resolves active provider from config — zero code change to switch providers
         services.AddSingleton<SmsProviderFactory>();
