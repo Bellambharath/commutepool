@@ -11,15 +11,12 @@ public static class IdentityModuleExtensions
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        services.AddHttpClient("msg91");
-        services.AddHttpClient("fast2sms");
-
-        // Register ALL providers — factory picks the active one at runtime via Sms__Provider config
+        // Register ALL providers — factory picks the active one at runtime via Sms__Provider env var
         services.AddSingleton<ISmsProvider, ConsoleSmsProvider>();
         services.AddSingleton<ISmsProvider, Msg91SmsProvider>();
         services.AddSingleton<ISmsProvider, Fast2SmsSmsProvider>();
 
-        // Factory resolves active provider from config — no code change to switch
+        // Factory resolves active provider from config — zero code change to switch providers
         services.AddSingleton<SmsProviderFactory>();
 
         services.AddSingleton<JwtService>();

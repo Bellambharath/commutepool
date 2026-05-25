@@ -1,3 +1,4 @@
+using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
@@ -16,10 +17,10 @@ namespace CommutePool.Modules.Identity.Services.Sms;
 /// Free trial: sign up at https://msg91.com — get ~100 free SMS credits.
 /// </summary>
 public sealed class Msg91SmsProvider(
-    IHttpClientFactory httpFactory,
     IConfiguration config,
     ILogger<Msg91SmsProvider> logger) : ISmsProvider
 {
+    private static readonly HttpClient _http = new();
     private const string BaseUrl = "https://api.msg91.com/api/v5/";
 
     public string ProviderKey => "msg91";
@@ -30,7 +31,6 @@ public sealed class Msg91SmsProvider(
         var senderId   = config["Sms:Msg91:SenderId"]   ?? "CPOOL";
         var templateId = config["Sms:Msg91:TemplateId"] ?? throw new InvalidOperationException("Sms:Msg91:TemplateId not configured");
 
-        // Normalize to 10-digit (MSG91 expects country code separately)
         var mobile = toPhone.Replace("+91", "").Replace(" ", "");
 
         var payload = new
@@ -39,17 +39,17 @@ public sealed class Msg91SmsProvider(
             sender      = senderId,
             short_url   = "0",
             mobiles     = $"91{mobile}",
-            VAR1        = message   // Replace VAR1 with your DLT template variable name
+            VAR1        = message
         };
 
-        var http = httpFactory.CreateClient("msg91");
-        http.DefaultRequestHeaders.TryAddWithoutValidation("authkey", authKey);
-        http.DefaultRequestHeaders.TryAddWithoutValidation("accept", "application/json");
+        var request = new HttpRequestMessage(HttpMethod.Post, $"{BaseUrl}flow/")
+        {
+            Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json")
+        };
+        request.Headers.TryAddWithoutValidation("authkey", authKey);
+        request.Headers.TryAddWithoutValidation("accept", "application/json");
 
-        var json    = JsonSerializer.Serialize(payload);
-        var content = new StringContent(json, Encoding.UTF8, "application/json");
-
-        var response = await http.PostAsync($"{BaseUrl}flow/", content, ct);
+        var response = await _http.SendAsync(request, ct);
         var body     = await response.Content.ReadAsStringAsync(ct);
 
         if (!response.IsSuccessStatusCode)
