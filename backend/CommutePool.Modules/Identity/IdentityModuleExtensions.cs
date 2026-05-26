@@ -23,6 +23,9 @@ public static class IdentityModuleExtensions
         services.AddSingleton<JwtService>();
         services.AddSingleton<OtpService>();
 
+        // MediatR auto-registers: RefreshTokenHandler, VerifyOtpHandler, RequestOtpHandler
+        // via ModulesServiceExtensions.AddModules() assembly scan — no manual registration needed
+
         return services;
     }
 }
