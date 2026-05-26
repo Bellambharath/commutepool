@@ -17,8 +17,7 @@
     "@tanstack/react-query": "^5.40.0",
     "react-hook-form": "^7.52.0",
     "zod": "^3.23.8",
-    "zustand": "^4.5.2",
-    "@commutepool/shared": "workspace:*"
+    "zustand": "^4.5.2"
   },
   "devDependencies": {
     "typescript": "^5.4.0",
