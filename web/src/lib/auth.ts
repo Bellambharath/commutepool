@@ -44,6 +44,12 @@ export function clearTokens() {
 let isRefreshing = false;
 let refreshPromise: Promise<string | null> | null = null;
 
+// Single-fire guard: once we decide to redirect to login, never do it again
+// within the same page lifecycle. Prevents the middleware <-> apiFetch loop
+// where clearTokens() + reload causes middleware to see no token, redirect
+// to /auth/login, page reloads, apiFetch fires again on /offers, 401 again.
+let redirectingToLogin = false;
+
 async function tryRefreshToken(): Promise<string | null> {
   if (isRefreshing && refreshPromise) return refreshPromise;
   isRefreshing = true;
@@ -74,6 +80,12 @@ async function tryRefreshToken(): Promise<string | null> {
 }
 
 export async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
+  // If a redirect is already in flight, silently abort all other parallel
+  // fetches so they don't each independently trigger another redirect.
+  if (redirectingToLogin) {
+    throw new Error('Session expired. Redirecting to login.');
+  }
+
   let token = getAccessToken();
 
   const doFetch = (t: string | null) =>
@@ -94,10 +106,15 @@ export async function apiFetch<T>(path: string, options?: RequestInit): Promise<
     if (newToken) {
       res = await doFetch(newToken);
     }
-    // If still 401 after refresh attempt, clear cookies and go to login
+    // Still 401 after refresh — session is dead. Redirect ONCE only.
     if (res.status === 401) {
-      clearTokens();
-      window.location.href = '/auth/login';
+      if (!redirectingToLogin) {
+        redirectingToLogin = true;
+        clearTokens();
+        // replace() instead of href: replaces history entry so the back
+        // button cannot loop the user back into the expired session page.
+        window.location.replace('/auth/login');
+      }
       throw new Error('Session expired. Please log in again.');
     }
   }
