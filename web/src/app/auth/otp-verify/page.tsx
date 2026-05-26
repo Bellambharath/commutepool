@@ -1,7 +1,6 @@
 'use client';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Suspense } from 'react';
 
 function OtpVerifyContent() {
   const router = useRouter();
@@ -41,13 +40,23 @@ function OtpVerifyContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone: `+91${phone}`, otp: code }),
       });
-      if (!res.ok) throw new Error('Invalid OTP. Please try again.');
-      const data = await res.json();
-      if (data.accessToken) {
-        document.cookie = `accessToken=${data.accessToken}; path=/; max-age=86400`;
-        document.cookie = `refreshToken=${data.refreshToken}; path=/; max-age=2592000`;
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error((body as any)?.message || 'Invalid OTP. Please try again.');
       }
-      router.push('/offers');
+      const data = await res.json();
+
+      // Write cookies BEFORE navigating so they're available on the next page
+      if (data.accessToken) {
+        document.cookie = `accessToken=${encodeURIComponent(data.accessToken)}; path=/; max-age=86400; SameSite=Lax`;
+      }
+      if (data.refreshToken) {
+        document.cookie = `refreshToken=${encodeURIComponent(data.refreshToken)}; path=/; max-age=2592000; SameSite=Lax`;
+      }
+
+      // Use full navigation (not SPA router.push) so cookie is flushed before the
+      // next page mounts and reads document.cookie
+      window.location.href = '/offers';
     } catch (err: any) {
       setError(err.message || 'Verification failed');
       setLoading(false);
@@ -60,14 +69,14 @@ function OtpVerifyContent() {
     <main style={styles.page}>
       <div style={styles.card}>
         <svg width="40" height="40" viewBox="0 0 40 40" fill="none" aria-label="CommutePool" style={{ marginBottom: '12px' }}>
-          <circle cx="20" cy="20" r="20" fill="#1B8A5A" />
+          <circle cx="20" cy="20" r="20" fill="#01696f" />
           <circle cx="13" cy="22" r="4" fill="white" />
           <circle cx="27" cy="22" r="4" fill="white" />
           <path d="M11 19 Q20 12 29 19" stroke="white" strokeWidth="2" fill="none" strokeLinecap="round" />
         </svg>
 
         <h2 style={styles.title}>Enter OTP</h2>
-        <p style={styles.sub}>Sent to +91 {phone}</p>
+        <p style={styles.sub}>Sent to +91&nbsp;{phone}</p>
 
         <form onSubmit={handleVerify} style={{ width: '100%' }}>
           <div style={styles.otpRow}>
@@ -83,7 +92,7 @@ function OtpVerifyContent() {
                 onKeyDown={e => handleKeyDown(e, i)}
                 style={{
                   ...styles.otpBox,
-                  borderColor: digit ? '#1B8A5A' : '#e0e0e0',
+                  borderColor: digit ? '#01696f' : '#e0e0e0',
                 }}
               />
             ))}
@@ -141,17 +150,8 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     alignItems: 'center',
   },
-  title: {
-    fontSize: '22px',
-    fontWeight: 700,
-    color: '#1a1a1a',
-    margin: '0 0 6px',
-  },
-  sub: {
-    fontSize: '14px',
-    color: '#888',
-    margin: '0 0 28px',
-  },
+  title: { fontSize: '22px', fontWeight: 700, color: '#1a1a1a', margin: '0 0 6px' },
+  sub:   { fontSize: '14px', color: '#888', margin: '0 0 28px' },
   otpRow: {
     display: 'flex',
     gap: '10px',
@@ -174,26 +174,13 @@ const styles: Record<string, React.CSSProperties> = {
     width: '100%',
     marginTop: '20px',
     padding: '14px',
-    background: '#1B8A5A',
+    background: '#01696f',
     color: '#fff',
     border: 'none',
     borderRadius: '10px',
     fontSize: '16px',
     fontWeight: 600,
   },
-  error: {
-    color: '#e53935',
-    fontSize: '13px',
-    marginTop: '10px',
-    textAlign: 'center',
-  },
-  back: {
-    marginTop: '20px',
-    background: 'none',
-    border: 'none',
-    color: '#1B8A5A',
-    fontSize: '14px',
-    cursor: 'pointer',
-    fontWeight: 500,
-  },
+  error: { color: '#e53935', fontSize: '13px', marginTop: '10px', textAlign: 'center' },
+  back:  { marginTop: '20px', background: 'none', border: 'none', color: '#01696f', fontSize: '14px', cursor: 'pointer', fontWeight: 500 },
 };

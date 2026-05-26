@@ -1,13 +1,22 @@
-// Shared auth helpers used across all pages
+// Shared auth helpers
 export function getAccessToken(): string | null {
   if (typeof document === 'undefined') return null;
-  const match = document.cookie.match(/(?:^|; )accessToken=([^;]*)/);
-  return match ? decodeURIComponent(match[1]) : null;
+  // Split on "; " to handle all cookie string formats reliably
+  const cookies = document.cookie.split('; ');
+  for (const cookie of cookies) {
+    const eqIdx = cookie.indexOf('=');
+    if (eqIdx === -1) continue;
+    const name = cookie.slice(0, eqIdx).trim();
+    if (name === 'accessToken') {
+      return decodeURIComponent(cookie.slice(eqIdx + 1));
+    }
+  }
+  return null;
 }
 
 export function clearTokens() {
-  document.cookie = 'accessToken=; path=/; max-age=0';
-  document.cookie = 'refreshToken=; path=/; max-age=0';
+  document.cookie = 'accessToken=; path=/; max-age=0; SameSite=Lax';
+  document.cookie = 'refreshToken=; path=/; max-age=0; SameSite=Lax';
 }
 
 export async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
