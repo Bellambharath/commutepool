@@ -18,14 +18,14 @@ builder.Host.UseSerilog((ctx, cfg) =>
        .WriteTo.Console());
 
 // ── JWT Auth ─────────────────────────────────────────────────────────────────
-// Read from env var first (Render secret), then appsettings fallback
-var jwtSecret =
-    Environment.GetEnvironmentVariable("JWT_SECRET")
-    ?? builder.Configuration["Jwt:Secret"];
+// On Render: set  Jwt__Secret=<value>  (double-underscore = colon separator in .NET config)
+// This is the SAME value JwtService reads via configuration["Jwt:Secret"]
+// so tokens issued and validated always use the same key.
+var jwtSecret = builder.Configuration["Jwt:Secret"];
 
 if (string.IsNullOrWhiteSpace(jwtSecret))
     throw new InvalidOperationException(
-        "JWT secret is required. Set JWT_SECRET env var or Jwt:Secret in appsettings.");
+        "JWT secret is required. Set Jwt__Secret env var on Render (or Jwt:Secret in appsettings).");
 
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -71,7 +71,6 @@ builder.Services.AddCors(options =>
 var app = builder.Build();
 
 // ── Auto-apply EF Core migrations on startup ─────────────────────────────────
-// This creates all tables (including outbox_events) on a fresh database.
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<CommutePoolDbContext>();
