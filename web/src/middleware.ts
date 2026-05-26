@@ -7,22 +7,42 @@ export function middleware(request: NextRequest) {
 
   const isAuthPath = pathname.startsWith('/auth')
 
-  // No token → send to login (except for auth pages themselves)
+  // No token → redirect to login (except auth pages)
   if (!token && !isAuthPath) {
-    return NextResponse.redirect(new URL('/auth/login', request.url))
+    const loginUrl = new URL('/auth/login', request.url)
+    const res = NextResponse.redirect(loginUrl)
+    // Prevent this redirect response from being cached
+    res.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate')
+    return res
   }
 
-  // Has valid token → don't re-show auth pages
+  // Has token → don't show auth pages again
   if (token && isAuthPath) {
-    return NextResponse.redirect(new URL('/offers', request.url))
+    const offersUrl = new URL('/offers', request.url)
+    const res = NextResponse.redirect(offersUrl)
+    res.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate')
+    return res
   }
 
-  return NextResponse.next()
+  // Pass through — also strip CDN cache for protected pages
+  const res = NextResponse.next()
+  if (!isAuthPath) {
+    res.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate')
+  }
+  return res
 }
 
 export const config = {
-  // Run on all routes except Next.js internals, static assets, and API routes
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|icons|manifest.json|api/).*)',
+    /*
+     * Match all request paths EXCEPT:
+     * - _next/static  (static files)
+     * - _next/image   (image optimisation)
+     * - favicon.ico
+     * - icons/
+     * - manifest.json
+     * - api/          (API routes handle their own auth)
+     */
+    '/((?!_next/static|_next/image|favicon.ico|icons|manifest\.json|api/).*)',
   ],
 }

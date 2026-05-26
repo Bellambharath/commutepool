@@ -3,6 +3,9 @@ import { useEffect, useState } from 'react';
 import AppShell from '@/components/AppShell';
 import { apiFetch } from '@/lib/auth';
 
+// Prevent Vercel CDN from caching this page — middleware must run on every request
+export const dynamic = 'force-dynamic';
+
 interface Offer {
   offerId: string;
   ownerName: string;
