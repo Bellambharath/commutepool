@@ -44,18 +44,9 @@ function OtpVerifyContent() {
         const body = await res.json().catch(() => ({}));
         throw new Error((body as any)?.message || 'Invalid OTP. Please try again.');
       }
-      const data = await res.json();
-
-      // Write cookies BEFORE navigating so they're available on the next page
-      if (data.accessToken) {
-        document.cookie = `accessToken=${encodeURIComponent(data.accessToken)}; path=/; max-age=86400; SameSite=Lax`;
-      }
-      if (data.refreshToken) {
-        document.cookie = `refreshToken=${encodeURIComponent(data.refreshToken)}; path=/; max-age=2592000; SameSite=Lax`;
-      }
-
-      // Use full navigation (not SPA router.push) so cookie is flushed before the
-      // next page mounts and reads document.cookie
+      // Cookies are now set HttpOnly by the API route.
+      // Use full navigation so the browser sends the new cookies
+      // on the next request, letting the middleware pass through.
       window.location.href = '/offers';
     } catch (err: any) {
       setError(err.message || 'Verification failed');
@@ -76,7 +67,7 @@ function OtpVerifyContent() {
         </svg>
 
         <h2 style={styles.title}>Enter OTP</h2>
-        <p style={styles.sub}>Sent to +91&nbsp;{phone}</p>
+        <p style={styles.sub}>Sent to +91\u00a0{phone}</p>
 
         <form onSubmit={handleVerify} style={{ width: '100%' }}>
           <div style={styles.otpRow}>
@@ -109,12 +100,12 @@ function OtpVerifyContent() {
               cursor: !otpComplete || loading ? 'not-allowed' : 'pointer',
             }}
           >
-            {loading ? 'Verifying…' : 'Verify & Login'}
+            {loading ? 'Verifying\u2026' : 'Verify & Login'}
           </button>
         </form>
 
         <button onClick={() => router.push('/auth/login')} style={styles.back}>
-          ← Change number
+          \u2190 Change number
         </button>
       </div>
     </main>
