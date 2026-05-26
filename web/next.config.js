@@ -11,6 +11,24 @@ const nextConfig = {
       },
     ];
   },
+
+  // Belt-and-suspenders CDN kill-switch.
+  // `export const dynamic = 'force-dynamic'` on a page stops Next.js from
+  // *building* a prerender, but cannot evict a copy already sitting in
+  // Vercel's CDN from a previous deploy. This headers() block sets
+  // Cache-Control + Vary on every response at the framework level so the
+  // edge never serves a stale prerendered page to a different cookie context.
+  async headers() {
+    return [
+      {
+        source: '/((?!_next/static|_next/image|favicon\.ico|icons|manifest\.json).*)',
+        headers: [
+          { key: 'Cache-Control', value: 'no-store, no-cache, must-revalidate' },
+          { key: 'Vary',          value: 'Cookie' },
+        ],
+      },
+    ];
+  },
 };
 
 module.exports = nextConfig;
