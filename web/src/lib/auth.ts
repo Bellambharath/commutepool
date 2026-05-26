@@ -29,9 +29,10 @@ export function getRefreshToken(): string | null {
 }
 
 export function setTokens(accessToken: string, refreshToken?: string) {
-  document.cookie = `accessToken=${encodeURIComponent(accessToken)}; path=/; max-age=86400; SameSite=Lax`;
+  const secure = location.protocol === 'https:' ? '; Secure' : '';
+  document.cookie = `accessToken=${encodeURIComponent(accessToken)}; path=/; max-age=86400; SameSite=Lax${secure}`;
   if (refreshToken) {
-    document.cookie = `refreshToken=${encodeURIComponent(refreshToken)}; path=/; max-age=2592000; SameSite=Lax`;
+    document.cookie = `refreshToken=${encodeURIComponent(refreshToken)}; path=/; max-age=2592000; SameSite=Lax${secure}`;
   }
 }
 
@@ -93,7 +94,7 @@ export async function apiFetch<T>(path: string, options?: RequestInit): Promise<
     if (newToken) {
       res = await doFetch(newToken);
     }
-    // If still 401 after refresh, clear and redirect to login
+    // If still 401 after refresh attempt, clear cookies and go to login
     if (res.status === 401) {
       clearTokens();
       window.location.href = '/auth/login';

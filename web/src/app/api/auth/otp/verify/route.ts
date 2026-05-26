@@ -24,10 +24,14 @@ export async function POST(req: NextRequest) {
 
   const response = NextResponse.json(data, { status: 200 });
 
-  // Set HttpOnly cookies so Edge middleware can read them on the next request
+  // NOTE: httpOnly is intentionally NOT set here.
+  // The Edge middleware reads the cookie server-side (works with or without httpOnly),
+  // but lib/auth.ts reads it client-side via document.cookie — which requires
+  // httpOnly=false. Setting httpOnly=true was causing apiFetch() to always send
+  // no token → 401 → clearTokens() → redirect loop.
   if (typeof data.accessToken === 'string') {
     response.cookies.set('accessToken', data.accessToken, {
-      httpOnly: true,
+      httpOnly: false,
       sameSite: 'lax',
       path: '/',
       maxAge: 60 * 60 * 24,          // 1 day
@@ -36,7 +40,7 @@ export async function POST(req: NextRequest) {
   }
   if (typeof data.refreshToken === 'string') {
     response.cookies.set('refreshToken', data.refreshToken, {
-      httpOnly: true,
+      httpOnly: false,
       sameSite: 'lax',
       path: '/',
       maxAge: 60 * 60 * 24 * 30,     // 30 days
