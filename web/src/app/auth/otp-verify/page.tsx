@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { setTokens } from '@/lib/auth';
 
 // Never let Vercel cache the RSC payload for this page — it breaks the
 // Next.js client router after OTP verify because the prerendered payload
@@ -49,6 +50,19 @@ function OtpVerifyContent() {
         const body = await res.json().catch(() => ({}));
         throw new Error((body as any)?.message || 'Invalid OTP. Please try again.');
       }
+
+      const data = await res.json().catch(() => ({})) as Record<string, unknown>;
+
+      // Write tokens into document.cookie BEFORE navigating.
+      // router.replace() fires an RSC fetch for /offers immediately — if the
+      // browser hasn't committed the Set-Cookie headers from this response yet
+      // (race condition), the middleware sees no accessToken and redirects back
+      // to /auth/login. Explicitly setting via setTokens() guarantees the cookie
+      // is present in document.cookie before the next navigation request is sent.
+      if (typeof data.accessToken === 'string') {
+        setTokens(data.accessToken, typeof data.refreshToken === 'string' ? data.refreshToken : undefined);
+      }
+
       // Use Next.js router.replace so the client stays in the same navigation
       // context. window.location.href causes a hard reload which triggers an
       // extra RSC prefetch of /auth/login, creating a redirect loop on Vercel.
