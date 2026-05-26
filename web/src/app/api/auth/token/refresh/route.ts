@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
 
   let backendRes: Response;
   try {
-    backendRes = await fetch(`${API_BASE}/api/auth/refresh`, {
+    backendRes = await fetch(`${API_BASE}/api/auth/token/refresh`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refreshToken }),
