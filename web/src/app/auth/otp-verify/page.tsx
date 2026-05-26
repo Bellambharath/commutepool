@@ -3,9 +3,7 @@ import { useState, useEffect, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { setTokens } from '@/lib/auth';
 
-// Never let Vercel cache the RSC payload for this page — it breaks the
-// Next.js client router after OTP verify because the prerendered payload
-// carries a stale router state.
+// Never let Vercel cache the RSC payload for this page.
 export const dynamic = 'force-dynamic';
 
 function OtpVerifyContent() {
@@ -46,26 +44,25 @@ function OtpVerifyContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone: `+91${phone}`, otp: code }),
       });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error((body as any)?.message || 'Invalid OTP. Please try again.');
-      }
 
+      // Parse the body ONCE — a Response body is a one-shot ReadableStream.
+      // Calling res.json() twice silently returns {} on the second call,
+      // which was dropping the tokens and preventing setTokens() from running.
       const data = await res.json().catch(() => ({})) as Record<string, unknown>;
 
-      // Write tokens into document.cookie BEFORE navigating.
-      // router.replace() fires an RSC fetch for /offers immediately — if the
-      // browser hasn't committed the Set-Cookie headers from this response yet
-      // (race condition), the middleware sees no accessToken and redirects back
-      // to /auth/login. Explicitly setting via setTokens() guarantees the cookie
-      // is present in document.cookie before the next navigation request is sent.
-      if (typeof data.accessToken === 'string') {
-        setTokens(data.accessToken, typeof data.refreshToken === 'string' ? data.refreshToken : undefined);
+      if (!res.ok) {
+        throw new Error((data as any)?.message || 'Invalid OTP. Please try again.');
       }
 
-      // Use Next.js router.replace so the client stays in the same navigation
-      // context. window.location.href causes a hard reload which triggers an
-      // extra RSC prefetch of /auth/login, creating a redirect loop on Vercel.
+      // Write tokens into document.cookie BEFORE navigating so the Edge
+      // middleware sees the accessToken cookie on the /offers RSC fetch.
+      if (typeof data.accessToken === 'string') {
+        setTokens(
+          data.accessToken,
+          typeof data.refreshToken === 'string' ? data.refreshToken : undefined,
+        );
+      }
+
       router.replace('/offers');
     } catch (err: any) {
       setError(err.message || 'Verification failed');
@@ -86,7 +83,6 @@ function OtpVerifyContent() {
         </svg>
 
         <h2 style={styles.title}>Enter OTP</h2>
-        {/* Use {' '} for the non-breaking space — JSX strings don't process \uXXXX escapes */}
         <p style={styles.sub}>Sent to +91{' '}{phone}</p>
 
         <form onSubmit={handleVerify} style={{ width: '100%' }}>
@@ -120,13 +116,11 @@ function OtpVerifyContent() {
               cursor: !otpComplete || loading ? 'not-allowed' : 'pointer',
             }}
           >
-            {/* Use a real ellipsis character — JSX strings don't process \uXXXX */}
             {loading ? 'Verifying…' : 'Verify & Login'}
           </button>
         </form>
 
         <button onClick={() => router.push('/auth/login')} style={styles.back}>
-          {/* Real left arrow — same reason */}
           ← Change number
         </button>
       </div>
