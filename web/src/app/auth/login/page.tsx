@@ -2,6 +2,11 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
+// Belt-and-suspenders: layout.tsx already sets force-dynamic globally,
+// but keeping it here too ensures this page is never prerendered even if
+// the layout changes in future.
+export const dynamic = 'force-dynamic';
+
 export default function LoginPage() {
   const router = useRouter();
   const [phone, setPhone] = useState('');
