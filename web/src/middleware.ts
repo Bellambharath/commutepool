@@ -11,8 +11,8 @@ export function middleware(request: NextRequest) {
   if (!token && !isAuthPath) {
     const loginUrl = new URL('/auth/login', request.url)
     const res = NextResponse.redirect(loginUrl)
-    // Prevent this redirect response from being cached
     res.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate')
+    res.headers.set('Vary', 'Cookie')
     return res
   }
 
@@ -21,11 +21,15 @@ export function middleware(request: NextRequest) {
     const offersUrl = new URL('/offers', request.url)
     const res = NextResponse.redirect(offersUrl)
     res.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate')
+    res.headers.set('Vary', 'Cookie')
     return res
   }
 
-  // Pass through — also strip CDN cache for protected pages
+  // Pass through — strip CDN cache for all protected pages
   const res = NextResponse.next()
+  // Vary: Cookie tells Vercel's edge: never serve one user's cached response to another.
+  // Without this, PRERENDER/HIT entries can bypass middleware entirely.
+  res.headers.set('Vary', 'Cookie')
   if (!isAuthPath) {
     res.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate')
   }
@@ -43,6 +47,6 @@ export const config = {
      * - manifest.json
      * - api/          (API routes handle their own auth)
      */
-    '/((?!_next/static|_next/image|favicon.ico|icons|manifest\.json|api/).*)',
+    '/((?!_next/static|_next/image|favicon.ico|icons|manifest\\.json|api/).*)',
   ],
 }
