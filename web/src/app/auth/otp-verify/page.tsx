@@ -2,6 +2,11 @@
 import { useState, useEffect, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
+// Never let Vercel cache the RSC payload for this page — it breaks the
+// Next.js client router after OTP verify because the prerendered payload
+// carries a stale router state.
+export const dynamic = 'force-dynamic';
+
 function OtpVerifyContent() {
   const router = useRouter();
   const params = useSearchParams();
@@ -44,10 +49,10 @@ function OtpVerifyContent() {
         const body = await res.json().catch(() => ({}));
         throw new Error((body as any)?.message || 'Invalid OTP. Please try again.');
       }
-      // Cookies are now set HttpOnly by the API route.
-      // Use full navigation so the browser sends the new cookies
-      // on the next request, letting the middleware pass through.
-      window.location.href = '/offers';
+      // Use Next.js router.replace so the client stays in the same navigation
+      // context. window.location.href causes a hard reload which triggers an
+      // extra RSC prefetch of /auth/login, creating a redirect loop on Vercel.
+      router.replace('/offers');
     } catch (err: any) {
       setError(err.message || 'Verification failed');
       setLoading(false);
@@ -67,7 +72,8 @@ function OtpVerifyContent() {
         </svg>
 
         <h2 style={styles.title}>Enter OTP</h2>
-        <p style={styles.sub}>Sent to +91\u00a0{phone}</p>
+        {/* Use {' '} for the non-breaking space — JSX strings don't process \uXXXX escapes */}
+        <p style={styles.sub}>Sent to +91{' '}{phone}</p>
 
         <form onSubmit={handleVerify} style={{ width: '100%' }}>
           <div style={styles.otpRow}>
@@ -100,12 +106,14 @@ function OtpVerifyContent() {
               cursor: !otpComplete || loading ? 'not-allowed' : 'pointer',
             }}
           >
-            {loading ? 'Verifying\u2026' : 'Verify & Login'}
+            {/* Use a real ellipsis character — JSX strings don't process \uXXXX */}
+            {loading ? 'Verifying…' : 'Verify & Login'}
           </button>
         </form>
 
         <button onClick={() => router.push('/auth/login')} style={styles.back}>
-          \u2190 Change number
+          {/* Real left arrow — same reason */}
+          ← Change number
         </button>
       </div>
     </main>
