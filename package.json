@@ -3,8 +3,8 @@
   "private": true,
   "version": "0.1.0",
   "scripts": {
-    "dev:web": "pnpm --filter web dev",
-    "dev:admin": "pnpm --filter admin dev",
+    "dev:web": "npm --filter web dev",
+    "dev:admin": "npm --filter admin dev",
     "build": "turbo build",
     "lint": "turbo lint",
     "type-check": "turbo type-check",
@@ -18,7 +18,11 @@
       "styled-jsx": "5.1.1"
     }
   },
-  "packageManager": "pnpm@9.15.4",
+  "workspaces": [
+    "web",
+    "admin",
+    "packages/*"
+  ],
   "engines": {
     "node": ">=20.0.0"
   }
