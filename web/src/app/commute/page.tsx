@@ -3,12 +3,8 @@ import { useEffect, useState } from 'react';
 import AppShell from '@/components/AppShell';
 import { apiFetch } from '@/lib/auth';
 
-interface Corridor { id: string; name: string; }
-
 interface CommuteProfileDto {
   id: string;
-  corridorId: string;
-  corridorName: string;
   homeArea: string;
   homeLat: number;
   homeLng: number;
@@ -25,7 +21,6 @@ const DAYS = ['MON','TUE','WED','THU','FRI','SAT','SUN'];
 const DAY_LABELS: Record<string,string> = { MON:'Mon',TUE:'Tue',WED:'Wed',THU:'Thu',FRI:'Fri',SAT:'Sat',SUN:'Sun' };
 
 interface FormState {
-  corridorId: string;
   homeArea: string;
   homeLat: string;
   homeLng: string;
@@ -38,7 +33,6 @@ interface FormState {
 }
 
 const emptyForm = (): FormState => ({
-  corridorId: '',
   homeArea: '',
   homeLat: '',
   homeLng: '',
@@ -51,7 +45,6 @@ const emptyForm = (): FormState => ({
 });
 
 export default function CommutePage() {
-  const [corridors, setCorridors] = useState<Corridor[]>([]);
   const [profile, setProfile] = useState<CommuteProfileDto | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm());
   const [loading, setLoading] = useState(true);
@@ -60,27 +53,25 @@ export default function CommutePage() {
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
-    Promise.all([
-      fetch('/api/corridors').then(r => r.json()).catch(() => []),
-      apiFetch<CommuteProfileDto>('/api/commute/profile').catch(() => null),
-    ]).then(([corrs, prof]) => {
-      setCorridors(corrs ?? []);
-      if (prof) {
-        setProfile(prof);
-        setForm({
-          corridorId: prof.corridorId,
-          homeArea: prof.homeArea,
-          homeLat: String(prof.homeLat),
-          homeLng: String(prof.homeLng),
-          officeArea: prof.officeArea,
-          officeLat: String(prof.officeLat),
-          officeLng: String(prof.officeLng),
-          morningDepartureTime: prof.morningDepartureTime,
-          eveningDepartureTime: prof.eveningDepartureTime,
-          activeDays: prof.activeDays,
-        });
-      }
-    }).finally(() => setLoading(false));
+    apiFetch<CommuteProfileDto>('/api/commute/profile')
+      .then(prof => {
+        if (prof) {
+          setProfile(prof);
+          setForm({
+            homeArea: prof.homeArea,
+            homeLat: String(prof.homeLat),
+            homeLng: String(prof.homeLng),
+            officeArea: prof.officeArea,
+            officeLat: String(prof.officeLat),
+            officeLng: String(prof.officeLng),
+            morningDepartureTime: prof.morningDepartureTime,
+            eveningDepartureTime: prof.eveningDepartureTime,
+            activeDays: prof.activeDays,
+          });
+        }
+      })
+      .catch(() => null)
+      .finally(() => setLoading(false));
   }, []);
 
   async function handleSave(e: React.FormEvent) {
@@ -90,8 +81,6 @@ export default function CommutePage() {
     setSuccess(false);
     try {
       const payload = {
-        userId: '00000000-0000-0000-0000-000000000000', // overwritten by controller
-        corridorId: form.corridorId,
         homeArea: form.homeArea,
         homeLat: parseFloat(form.homeLat) || 0,
         homeLng: parseFloat(form.homeLng) || 0,
@@ -152,12 +141,8 @@ export default function CommutePage() {
             </div>
           )}
 
-          <Field label="Corridor">
-            <select style={s.input} value={form.corridorId} onChange={e => upd('corridorId', e.target.value)} required>
-              <option value="">Select corridor…</option>
-              {corridors.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-          </Field>
+          {/* Starting point */}
+          <div style={s.sectionHeader}>🏠 Starting Point (Home)</div>
 
           <Field label="Home / Pickup area">
             <input style={s.input} value={form.homeArea} onChange={e => upd('homeArea', e.target.value)} placeholder="e.g. Anjaiah Nagar" required />
@@ -172,6 +157,9 @@ export default function CommutePage() {
             </Field>
           </div>
 
+          {/* Ending point */}
+          <div style={s.sectionHeader}>🏢 Ending Point (Office / Destination)</div>
+
           <Field label="Office / Destination area">
             <input style={s.input} value={form.officeArea} onChange={e => upd('officeArea', e.target.value)} placeholder="e.g. Inorbit Mall" required />
           </Field>
@@ -184,6 +172,9 @@ export default function CommutePage() {
               <input style={s.input} type="number" step="any" value={form.officeLng} onChange={e => upd('officeLng', e.target.value)} placeholder="78.3800" />
             </Field>
           </div>
+
+          {/* Schedule */}
+          <div style={s.sectionHeader}>🕐 Schedule</div>
 
           <Field label="Morning departure">
             <input style={s.input} type="time" value={form.morningDepartureTime} onChange={e => upd('morningDepartureTime', e.target.value)} required />
@@ -234,4 +225,5 @@ const s: Record<string, React.CSSProperties> = {
   dayBtn:       { padding: '8px 12px', borderRadius: 8, border: '1.5px solid #ddd', background: '#fff', fontSize: 13, fontWeight: 500, cursor: 'pointer', color: '#555' },
   dayBtnActive: { background: '#01696f', color: '#fff', borderColor: '#01696f' },
   saveBtn:      { padding: '14px', background: '#01696f', color: '#fff', border: 'none', borderRadius: 12, fontSize: 15, fontWeight: 700, cursor: 'pointer' },
+  sectionHeader:{ fontSize: 13, fontWeight: 700, color: '#01696f', letterSpacing: '0.02em', paddingTop: 4 },
 };
