@@ -3,44 +3,106 @@ import { useEffect, useState } from 'react';
 import AppShell from '@/components/AppShell';
 import { apiFetch } from '@/lib/auth';
 
-interface CommuteProfile {
-  profileId?: string;
-  fromLocation: string;
-  toLocation: string;
-  departureTime: string;
-  returnTime?: string;
-  daysOfWeek: string[];
-  role: 'Owner' | 'Rider' | 'Both';
-  status: 'Active' | 'Paused';
+interface Corridor { id: string; name: string; }
+
+interface CommuteProfileDto {
+  id: string;
+  corridorId: string;
+  corridorName: string;
+  homeArea: string;
+  homeLat: number;
+  homeLng: number;
+  officeArea: string;
+  officeLat: number;
+  officeLng: number;
+  morningDepartureTime: string;
+  eveningDepartureTime: string;
+  activeDays: string[];
+  paused: boolean;
 }
 
-const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const DAYS = ['MON','TUE','WED','THU','FRI','SAT','SUN'];
+const DAY_LABELS: Record<string,string> = { MON:'Mon',TUE:'Tue',WED:'Wed',THU:'Thu',FRI:'Fri',SAT:'Sat',SUN:'Sun' };
+
+interface FormState {
+  corridorId: string;
+  homeArea: string;
+  homeLat: string;
+  homeLng: string;
+  officeArea: string;
+  officeLat: string;
+  officeLng: string;
+  morningDepartureTime: string;
+  eveningDepartureTime: string;
+  activeDays: string[];
+}
+
+const emptyForm = (): FormState => ({
+  corridorId: '',
+  homeArea: '',
+  homeLat: '',
+  homeLng: '',
+  officeArea: '',
+  officeLat: '',
+  officeLng: '',
+  morningDepartureTime: '09:00',
+  eveningDepartureTime: '18:00',
+  activeDays: ['MON','TUE','WED','THU','FRI'],
+});
 
 export default function CommutePage() {
-  const [profile, setProfile] = useState<CommuteProfile | null>(null);
+  const [corridors, setCorridors] = useState<Corridor[]>([]);
+  const [profile, setProfile] = useState<CommuteProfileDto | null>(null);
+  const [form, setForm] = useState<FormState>(emptyForm());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
-    apiFetch<CommuteProfile>('/api/commute/profile')
-      .then(setProfile)
-      .catch(() => {
-        // 404 = not set up yet, show empty form
-        setProfile({ fromLocation: '', toLocation: '', departureTime: '09:00', daysOfWeek: ['Mon','Tue','Wed','Thu','Fri'], role: 'Rider', status: 'Active' });
-      })
-      .finally(() => setLoading(false));
+    Promise.all([
+      fetch('/api/corridors').then(r => r.json()).catch(() => []),
+      apiFetch<CommuteProfileDto>('/api/commute/profile').catch(() => null),
+    ]).then(([corrs, prof]) => {
+      setCorridors(corrs ?? []);
+      if (prof) {
+        setProfile(prof);
+        setForm({
+          corridorId: prof.corridorId,
+          homeArea: prof.homeArea,
+          homeLat: String(prof.homeLat),
+          homeLng: String(prof.homeLng),
+          officeArea: prof.officeArea,
+          officeLat: String(prof.officeLat),
+          officeLng: String(prof.officeLng),
+          morningDepartureTime: prof.morningDepartureTime,
+          eveningDepartureTime: prof.eveningDepartureTime,
+          activeDays: prof.activeDays,
+        });
+      }
+    }).finally(() => setLoading(false));
   }, []);
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
-    if (!profile) return;
     setSaving(true);
     setError(null);
     setSuccess(false);
     try {
-      await apiFetch('/api/commute/profile', { method: 'PUT', body: JSON.stringify(profile) });
+      const payload = {
+        userId: '00000000-0000-0000-0000-000000000000', // overwritten by controller
+        corridorId: form.corridorId,
+        homeArea: form.homeArea,
+        homeLat: parseFloat(form.homeLat) || 0,
+        homeLng: parseFloat(form.homeLng) || 0,
+        officeArea: form.officeArea,
+        officeLat: parseFloat(form.officeLat) || 0,
+        officeLng: parseFloat(form.officeLng) || 0,
+        morningDepartureTime: form.morningDepartureTime + ':00',
+        eveningDepartureTime: form.eveningDepartureTime + ':00',
+        activeDays: form.activeDays,
+      };
+      await apiFetch('/api/commute/profile', { method: 'PUT', body: JSON.stringify(payload) });
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
     } catch (err: any) {
@@ -52,74 +114,91 @@ export default function CommutePage() {
 
   async function togglePause() {
     if (!profile) return;
-    const endpoint = profile.status === 'Active' ? '/api/commute/profile/pause' : '/api/commute/profile/resume';
+    const endpoint = profile.paused ? '/api/commute/profile/resume' : '/api/commute/profile/pause';
     try {
       await apiFetch(endpoint, { method: 'POST' });
-      setProfile(p => p ? { ...p, status: p.status === 'Active' ? 'Paused' : 'Active' } : p);
+      setProfile(p => p ? { ...p, paused: !p.paused } : p);
     } catch (err: any) {
       setError(err.message);
     }
   }
 
-  function update<K extends keyof CommuteProfile>(key: K, value: CommuteProfile[K]) {
-    setProfile(p => p ? { ...p, [key]: value } : p);
+  function upd<K extends keyof FormState>(key: K, val: FormState[K]) {
+    setForm(f => ({ ...f, [key]: val }));
   }
 
-  function toggleDay(day: string) {
-    if (!profile) return;
-    const days = profile.daysOfWeek.includes(day)
-      ? profile.daysOfWeek.filter(d => d !== day)
-      : [...profile.daysOfWeek, day];
-    update('daysOfWeek', days);
+  function toggleDay(d: string) {
+    setForm(f => ({
+      ...f,
+      activeDays: f.activeDays.includes(d) ? f.activeDays.filter(x => x !== d) : [...f.activeDays, d],
+    }));
   }
 
   return (
     <AppShell title="Commute Profile">
       {loading && <div style={{ padding: '40px 0', textAlign: 'center', color: '#999' }}>Loading…</div>}
-      {!loading && profile && (
+      {!loading && (
         <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-          {/* Status badge + toggle */}
-          {profile.profileId && (
+          {profile && (
             <div style={s.statusRow}>
-              <span style={{ ...s.statusDot, background: profile.status === 'Active' ? '#437a22' : '#964219' }} />
-              <span style={{ fontSize: 14, fontWeight: 600, color: profile.status === 'Active' ? '#437a22' : '#964219' }}>{profile.status}</span>
+              <span style={{ ...s.statusDot, background: profile.paused ? '#964219' : '#437a22' }} />
+              <span style={{ fontSize: 14, fontWeight: 600, color: profile.paused ? '#964219' : '#437a22' }}>
+                {profile.paused ? 'Paused' : 'Active'}
+              </span>
               <button type="button" onClick={togglePause} style={s.toggleBtn}>
-                {profile.status === 'Active' ? 'Pause' : 'Resume'}
+                {profile.paused ? 'Resume' : 'Pause'}
               </button>
             </div>
           )}
 
-          <Field label="From (pickup area)">
-            <input style={s.input} value={profile.fromLocation} onChange={e => update('fromLocation', e.target.value)} placeholder="e.g. Kondapur" required />
-          </Field>
-
-          <Field label="To (office / corridor)">
-            <input style={s.input} value={profile.toLocation} onChange={e => update('toLocation', e.target.value)} placeholder="e.g. Hitech City" required />
-          </Field>
-
-          <Field label="Departure time">
-            <input style={s.input} type="time" value={profile.departureTime} onChange={e => update('departureTime', e.target.value)} required />
-          </Field>
-
-          <Field label="Return time (optional)">
-            <input style={s.input} type="time" value={profile.returnTime ?? ''} onChange={e => update('returnTime', e.target.value)} />
-          </Field>
-
-          <Field label="Role">
-            <select style={s.input} value={profile.role} onChange={e => update('role', e.target.value as any)}>
-              <option value="Rider">Rider (I need a ride)</option>
-              <option value="Owner">Owner (I offer my bike)</option>
-              <option value="Both">Both</option>
+          <Field label="Corridor">
+            <select style={s.input} value={form.corridorId} onChange={e => upd('corridorId', e.target.value)} required>
+              <option value="">Select corridor…</option>
+              {corridors.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
+          </Field>
+
+          <Field label="Home / Pickup area">
+            <input style={s.input} value={form.homeArea} onChange={e => upd('homeArea', e.target.value)} placeholder="e.g. Anjaiah Nagar" required />
+          </Field>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <Field label="Home Lat">
+              <input style={s.input} type="number" step="any" value={form.homeLat} onChange={e => upd('homeLat', e.target.value)} placeholder="17.3850" />
+            </Field>
+            <Field label="Home Lng">
+              <input style={s.input} type="number" step="any" value={form.homeLng} onChange={e => upd('homeLng', e.target.value)} placeholder="78.4867" />
+            </Field>
+          </div>
+
+          <Field label="Office / Destination area">
+            <input style={s.input} value={form.officeArea} onChange={e => upd('officeArea', e.target.value)} placeholder="e.g. Inorbit Mall" required />
+          </Field>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <Field label="Office Lat">
+              <input style={s.input} type="number" step="any" value={form.officeLat} onChange={e => upd('officeLat', e.target.value)} placeholder="17.4340" />
+            </Field>
+            <Field label="Office Lng">
+              <input style={s.input} type="number" step="any" value={form.officeLng} onChange={e => upd('officeLng', e.target.value)} placeholder="78.3800" />
+            </Field>
+          </div>
+
+          <Field label="Morning departure">
+            <input style={s.input} type="time" value={form.morningDepartureTime} onChange={e => upd('morningDepartureTime', e.target.value)} required />
+          </Field>
+
+          <Field label="Evening departure (return)">
+            <input style={s.input} type="time" value={form.eveningDepartureTime} onChange={e => upd('eveningDepartureTime', e.target.value)} />
           </Field>
 
           <Field label="Days of week">
             <div style={s.daysRow}>
               {DAYS.map(d => (
                 <button key={d} type="button" onClick={() => toggleDay(d)}
-                  style={{ ...s.dayBtn, ...(profile.daysOfWeek.includes(d) ? s.dayBtnActive : {}) }}>
-                  {d}
+                  style={{ ...s.dayBtn, ...(form.activeDays.includes(d) ? s.dayBtnActive : {}) }}>
+                  {DAY_LABELS[d]}
                 </button>
               ))}
             </div>
@@ -129,7 +208,7 @@ export default function CommutePage() {
           {success && <p style={{ color: '#437a22', fontSize: 13 }}>✓ Commute profile saved!</p>}
 
           <button type="submit" disabled={saving} style={{ ...s.saveBtn, opacity: saving ? 0.6 : 1 }}>
-            {saving ? 'Saving…' : profile.profileId ? 'Update Profile' : 'Create Profile'}
+            {saving ? 'Saving…' : profile ? 'Update Profile' : 'Create Profile'}
           </button>
         </form>
       )}
