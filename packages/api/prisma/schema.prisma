@@ -1,0 +1,538 @@
+// ============================================================
+// CommutePool — Prisma Schema
+// Rules:
+//   - All monetary amounts: integers in PAISE (never floats)
+//   - Soft deletes only — never hard delete user data
+//   - audit_logs is fully immutable (no updatedAt, no deletedAt)
+//   - PostGIS geometry columns added via raw SQL migration (0001_init)
+//   - All timestamps stored in UTC
+// ============================================================
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [postgis]
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum UserRole {
+  RIDER
+  OWNER
+  BOTH
+}
+
+enum UserStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+}
+
+enum VerificationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum CommutePeriod {
+  MORNING
+  EVENING
+}
+
+enum TripStatus {
+  SCHEDULED
+  ARRIVING
+  STARTED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum BookingStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  EXPIRED
+  CANCELLED
+}
+
+enum CancellationReason {
+  PENALTY_FREE
+  LATE_CANCEL
+  NO_SHOW
+  FORCE_MAJEURE
+}
+
+enum WeeklyRequestStatus {
+  OPEN
+  MATCHED
+  EXPIRED
+}
+
+enum ContributionPaymentMethod {
+  CASH
+  UPI
+}
+
+enum SupportTicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+// ---------------------------------------------------------------------------
+// 1. users
+// ---------------------------------------------------------------------------
+
+model User {
+  id                      String     @id @default(uuid())
+  phone                   String     @unique // format: +91XXXXXXXXXX
+  name                    String
+  photo_url               String?
+  role                    UserRole
+  status                  UserStatus @default(PENDING)
+  emergency_contact_name  String?
+  emergency_contact_phone String?
+  cancellation_strikes    Int        @default(0)
+  created_at              DateTime   @default(now())
+  updated_at              DateTime   @updatedAt
+  deleted_at              DateTime? // soft delete
+
+  // Relations
+  bike_owner_profile  BikeOwnerProfile?
+  commute_routes      CommuteRoute[]
+  weekly_offers       WeeklyOffer[]      @relation("OwnerWeeklyOffers")
+  weekly_requests     WeeklyRequest[]    @relation("RiderWeeklyRequests")
+  bookings_as_rider   Booking[]          @relation("RiderBookings")
+  bookings_as_owner   Booking[]          @relation("OwnerBookings")
+  trips_as_rider      Trip[]             @relation("RiderTrips")
+  trips_as_owner      Trip[]             @relation("OwnerTrips")
+  contributions_rider Contribution[]     @relation("RiderContributions")
+  contributions_owner Contribution[]     @relation("OwnerContributions")
+  ratings_given       Rating[]           @relation("RaterRatings")
+  ratings_received    Rating[]           @relation("RateeRatings")
+  cancellations       Cancellation[]     @relation("CancelledBy")
+  support_tickets     SupportTicket[]    @relation("RaisedBy")
+  resolved_tickets    SupportTicket[]    @relation("ResolvedBy")
+  audit_logs          AuditLog[]         @relation("AdminAuditLogs")
+  fuel_prices         AdminFuelPrice[]   @relation("FuelPriceCreatedBy")
+  bike_mileages       AdminBikeMileage[] @relation("BikeMileageCreatedBy")
+  refresh_tokens      RefreshToken[]
+
+  @@map("users")
+}
+
+// ---------------------------------------------------------------------------
+// 2. bike_owner_profiles
+// ---------------------------------------------------------------------------
+
+model BikeOwnerProfile {
+  id                    String             @id @default(uuid())
+  user_id               String             @unique
+  bike_model            String
+  mileage_override_kmpl Int? // owner override in kmpl; null = use admin_bike_mileage table
+  dl_url                String // Cloudinary URL
+  rc_url                String // Cloudinary URL
+  verification_status   VerificationStatus @default(PENDING)
+  verified_at           DateTime?
+  verified_by           String? // admin user id
+  rejection_reason      String?
+  created_at            DateTime           @default(now())
+  updated_at            DateTime           @updatedAt
+
+  user User @relation(fields: [user_id], references: [id])
+
+  @@map("bike_owner_profiles")
+}
+
+// ---------------------------------------------------------------------------
+// 3. commute_routes
+// PostGIS geometry column (LINESTRING 4326) is added via migration 0001_init.
+// ---------------------------------------------------------------------------
+
+model CommuteRoute {
+  id                    String        @id @default(uuid())
+  user_id               String
+  period                CommutePeriod
+  encoded_polyline      String // Google Maps encoded polyline string
+  distance_meters       Int // integer metres
+  duration_seconds      Int // integer seconds
+  route_label           String?
+  is_primary            Boolean       @default(false)
+  source_place_id       String
+  source_lat            Float
+  source_lng            Float
+  source_address        String
+  destination_place_id  String
+  destination_lat       Float
+  destination_lng       Float
+  destination_address   String
+  is_active             Boolean       @default(true)
+  created_at            DateTime      @default(now())
+  updated_at            DateTime      @updatedAt
+
+  user          User          @relation(fields: [user_id], references: [id])
+  weekly_offers WeeklyOffer[]
+
+  @@index([user_id])
+  @@index([user_id, period, is_active])
+  @@map("commute_routes")
+}
+
+// ---------------------------------------------------------------------------
+// 4. weekly_offers
+// ---------------------------------------------------------------------------
+
+model WeeklyOffer {
+  id                     String        @id @default(uuid())
+  owner_id               String
+  route_id               String
+  period                 CommutePeriod
+  week_start_date        DateTime      @db.Date // Monday of the week
+  days_available         Int[] // 0=Sun..6=Sat
+  departure_window_start String // HH:MM IST
+  departure_window_end   String // HH:MM IST
+  seats_available        Int           @default(1)
+  is_active              Boolean       @default(true)
+  created_at             DateTime      @default(now())
+  updated_at             DateTime      @updatedAt
+
+  owner    User         @relation("OwnerWeeklyOffers", fields: [owner_id], references: [id])
+  route    CommuteRoute @relation(fields: [route_id], references: [id])
+  matches  Match[]
+
+  @@index([owner_id])
+  @@index([week_start_date, period, is_active])
+  @@map("weekly_offers")
+}
+
+// ---------------------------------------------------------------------------
+// 5. weekly_requests
+// PostGIS geometry columns (pickup_geometry, dropoff_geometry) added via migration.
+// ---------------------------------------------------------------------------
+
+model WeeklyRequest {
+  id                     String               @id @default(uuid())
+  rider_id               String
+  period                 CommutePeriod
+  week_start_date        DateTime             @db.Date
+  days_needed            Int[]
+  pickup_lat             Float
+  pickup_lng             Float
+  pickup_address         String
+  pickup_place_id        String
+  dropoff_lat            Float
+  dropoff_lng            Float
+  dropoff_address        String
+  dropoff_place_id       String
+  departure_window_start String // HH:MM IST
+  departure_window_end   String // HH:MM IST
+  status                 WeeklyRequestStatus  @default(OPEN)
+  created_at             DateTime             @default(now())
+  updated_at             DateTime             @updatedAt
+
+  rider   User    @relation("RiderWeeklyRequests", fields: [rider_id], references: [id])
+  matches Match[]
+
+  @@index([rider_id])
+  @@index([week_start_date, period, status])
+  @@map("weekly_requests")
+}
+
+// ---------------------------------------------------------------------------
+// 6. matches
+// ---------------------------------------------------------------------------
+
+model Match {
+  id                        String   @id @default(uuid())
+  offer_id                  String
+  request_id                String
+  compatibility_score       Int // 0-100
+  detour_distance_meters    Int // integer metres
+  detour_cost_paise         Int // integer paise
+  base_contribution_paise   Int // integer paise
+  total_contribution_paise  Int // integer paise
+  pickup_point_lat          Float
+  pickup_point_lng          Float
+  pickup_walk_meters        Int
+  dropoff_point_lat         Float
+  dropoff_point_lng         Float
+  dropoff_walk_meters       Int
+  is_partial_route          Boolean  @default(false)
+  route_usage_percentage    Int // 0-100
+  created_at                DateTime @default(now())
+
+  offer    WeeklyOffer    @relation(fields: [offer_id], references: [id])
+  request  WeeklyRequest  @relation(fields: [request_id], references: [id])
+  bookings Booking[]
+
+  @@index([offer_id])
+  @@index([request_id])
+  @@map("matches")
+}
+
+// ---------------------------------------------------------------------------
+// 7. bookings
+// ---------------------------------------------------------------------------
+
+model Booking {
+  id                         String        @id @default(uuid())
+  match_id                   String
+  rider_id                   String
+  owner_id                   String
+  status                     BookingStatus @default(PENDING)
+  days_confirmed             Int[]
+  contribution_per_day_paise Int // integer paise
+  request_sent_at            DateTime
+  expires_at                 DateTime
+  responded_at               DateTime?
+  created_at                 DateTime      @default(now())
+  updated_at                 DateTime      @updatedAt
+
+  match         Match          @relation(fields: [match_id], references: [id])
+  rider         User           @relation("RiderBookings", fields: [rider_id], references: [id])
+  owner         User           @relation("OwnerBookings", fields: [owner_id], references: [id])
+  trips         Trip[]
+  cancellations Cancellation[]
+  support_tickets SupportTicket[]
+
+  @@index([rider_id])
+  @@index([owner_id])
+  @@index([status, expires_at])
+  @@map("bookings")
+}
+
+// ---------------------------------------------------------------------------
+// 8. trips
+// ---------------------------------------------------------------------------
+
+model Trip {
+  id                   String        @id @default(uuid())
+  booking_id           String
+  rider_id             String
+  owner_id             String
+  scheduled_date       DateTime      @db.Date
+  scheduled_departure  String // HH:MM IST
+  period               CommutePeriod
+  status               TripStatus    @default(SCHEDULED)
+  actual_departure     DateTime?
+  actual_arrival       DateTime?
+  pickup_confirmed_at  DateTime?
+  sos_triggered_at     DateTime?
+  sos_resolved_at      DateTime?
+  created_at           DateTime      @default(now())
+  updated_at           DateTime      @updatedAt
+
+  booking       Booking        @relation(fields: [booking_id], references: [id])
+  rider         User           @relation("RiderTrips", fields: [rider_id], references: [id])
+  owner         User           @relation("OwnerTrips", fields: [owner_id], references: [id])
+  contributions Contribution[]
+  ratings       Rating[]
+  cancellations Cancellation[]
+  support_tickets SupportTicket[]
+
+  @@index([booking_id])
+  @@index([rider_id, scheduled_date])
+  @@index([owner_id, scheduled_date])
+  @@index([status, scheduled_date])
+  @@map("trips")
+}
+
+// ---------------------------------------------------------------------------
+// 9. contributions
+// ---------------------------------------------------------------------------
+
+model Contribution {
+  id                    String                     @id @default(uuid())
+  trip_id               String
+  rider_id              String
+  owner_id              String
+  amount_paise          Int // integer paise — NEVER float
+  payment_method        ContributionPaymentMethod
+  marked_paid_at        DateTime? // owner marks received
+  confirmed_by_rider_at DateTime? // rider confirms sent
+  created_at            DateTime                   @default(now())
+
+  trip  Trip @relation(fields: [trip_id], references: [id])
+  rider User @relation("RiderContributions", fields: [rider_id], references: [id])
+  owner User @relation("OwnerContributions", fields: [owner_id], references: [id])
+
+  @@index([trip_id])
+  @@map("contributions")
+}
+
+// ---------------------------------------------------------------------------
+// 10. ratings
+// ---------------------------------------------------------------------------
+
+model Rating {
+  id         String   @id @default(uuid())
+  trip_id    String
+  rater_id   String
+  ratee_id   String
+  score      Int // 1-5
+  comment    String?
+  created_at DateTime @default(now())
+
+  trip  Trip @relation(fields: [trip_id], references: [id])
+  rater User @relation("RaterRatings", fields: [rater_id], references: [id])
+  ratee User @relation("RateeRatings", fields: [ratee_id], references: [id])
+
+  @@unique([trip_id, rater_id]) // one rating per rater per trip
+  @@index([ratee_id])
+  @@map("ratings")
+}
+
+// ---------------------------------------------------------------------------
+// 11. cancellations
+// ---------------------------------------------------------------------------
+
+model Cancellation {
+  id                     String             @id @default(uuid())
+  booking_id             String?
+  trip_id                String?
+  cancelled_by_id        String
+  reason_code            CancellationReason
+  hours_before_departure Float // computed at time of cancellation
+  penalty_applied        Int                @default(0) // strikes added: 0, 1, or 2
+  dispute_raised         Boolean            @default(false)
+  dispute_resolved_at    DateTime?
+  created_at             DateTime           @default(now())
+
+  booking      Booking? @relation(fields: [booking_id], references: [id])
+  trip         Trip?    @relation(fields: [trip_id], references: [id])
+  cancelled_by User     @relation("CancelledBy", fields: [cancelled_by_id], references: [id])
+
+  @@index([cancelled_by_id])
+  @@index([booking_id])
+  @@index([trip_id])
+  @@map("cancellations")
+}
+
+// ---------------------------------------------------------------------------
+// 12. support_tickets
+// ---------------------------------------------------------------------------
+
+model SupportTicket {
+  id              String              @id @default(uuid())
+  raised_by_id    String
+  trip_id         String?
+  booking_id      String?
+  subject         String
+  description     String
+  status          SupportTicketStatus @default(OPEN)
+  resolved_at     DateTime?
+  resolved_by_id  String?
+  created_at      DateTime            @default(now())
+  updated_at      DateTime            @updatedAt
+
+  raised_by   User     @relation("RaisedBy", fields: [raised_by_id], references: [id])
+  resolved_by User?    @relation("ResolvedBy", fields: [resolved_by_id], references: [id])
+  trip        Trip?    @relation(fields: [trip_id], references: [id])
+  booking     Booking? @relation(fields: [booking_id], references: [id])
+
+  @@index([raised_by_id])
+  @@index([status])
+  @@map("support_tickets")
+}
+
+// ---------------------------------------------------------------------------
+// 13. audit_logs — FULLY IMMUTABLE: no updatedAt, no deletedAt
+// ---------------------------------------------------------------------------
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  admin_id    String
+  action      String // e.g. "APPROVE_BIKE_OWNER"
+  entity_type String // e.g. "bike_owner_profiles"
+  entity_id   String
+  old_value   Json?
+  new_value   Json?
+  ip_address  String
+  created_at  DateTime @default(now())
+
+  admin User @relation("AdminAuditLogs", fields: [admin_id], references: [id])
+
+  @@index([admin_id])
+  @@index([entity_type, entity_id])
+  @@map("audit_logs")
+}
+
+// ---------------------------------------------------------------------------
+// 14. admin_fuel_prices
+// ---------------------------------------------------------------------------
+
+model AdminFuelPrice {
+  id                   String   @id @default(uuid())
+  city                 String   @default("Hyderabad")
+  price_paise_per_litre Int // integer paise e.g. 10500 = ₹105.00/litre
+  effective_from       DateTime
+  created_by_id        String
+  created_at           DateTime @default(now())
+
+  created_by User @relation("FuelPriceCreatedBy", fields: [created_by_id], references: [id])
+
+  @@index([city, effective_from])
+  @@map("admin_fuel_prices")
+}
+
+// ---------------------------------------------------------------------------
+// 15. admin_bike_mileage
+// ---------------------------------------------------------------------------
+
+model AdminBikeMileage {
+  id              String   @id @default(uuid())
+  bike_model      String   @unique
+  real_world_kmpl Int // integer kmpl
+  created_by_id   String
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  created_by User @relation("BikeMileageCreatedBy", fields: [created_by_id], references: [id])
+
+  @@map("admin_bike_mileage")
+}
+
+// ---------------------------------------------------------------------------
+// 16. otp_attempts
+// ---------------------------------------------------------------------------
+
+model OtpAttempt {
+  id         String   @id @default(uuid())
+  phone      String // +91XXXXXXXXXX
+  otp_hash   String // bcrypt hash of the 6-digit OTP
+  expires_at DateTime
+  attempts   Int      @default(0) // max 3 per TECH_DECISIONS.md
+  verified   Boolean  @default(false)
+  created_at DateTime @default(now())
+
+  @@index([phone, expires_at])
+  @@map("otp_attempts")
+}
+
+// ---------------------------------------------------------------------------
+// 17. refresh_tokens
+// ---------------------------------------------------------------------------
+
+model RefreshToken {
+  id         String    @id @default(uuid())
+  user_id    String
+  token_hash String // SHA-256 hash of the raw token
+  expires_at DateTime
+  revoked_at DateTime?
+  created_at DateTime  @default(now())
+
+  user User @relation(fields: [user_id], references: [id])
+
+  @@index([user_id])
+  @@index([token_hash])
+  @@map("refresh_tokens")
+}
