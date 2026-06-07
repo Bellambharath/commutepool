@@ -210,7 +210,7 @@ export interface Trip {
   actualDeparture: Date | null;
   actualArrival: Date | null;
   pickupConfirmedAt: Date | null;
-  sosTriggedAt: Date | null;
+  sosTriggeredAt: Date | null;
   sosResolvedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -234,7 +234,7 @@ export interface Cancellation {
   tripId: string | null;
   cancelledById: string;
   reasonCode: CancellationReason;
-  hoursBeforeDeparture: number; // computed at time of cancellation
+  minutesBeforeDeparture: number; // integer minutes before scheduled departure
   penaltyApplied: number; // number of strikes added (0, 1, or 2)
   disputeRaised: boolean;
   disputeResolvedAt: Date | null;

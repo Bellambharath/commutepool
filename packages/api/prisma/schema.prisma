@@ -4,7 +4,7 @@
 //   - All monetary amounts: integers in PAISE (never floats)
 //   - Soft deletes only — never hard delete user data
 //   - audit_logs is fully immutable (no updatedAt, no deletedAt)
-//   - PostGIS geometry columns added via raw SQL migration (0001_init)
+//   - PostGIS geometry columns added via prisma/postgis.sql (NOT here)
 //   - All timestamps stored in UTC
 // ============================================================
 
@@ -155,7 +155,7 @@ model BikeOwnerProfile {
 
 // ---------------------------------------------------------------------------
 // 3. commute_routes
-// PostGIS geometry column (LINESTRING 4326) is added via migration 0001_init.
+// PostGIS geometry column (LINESTRING 4326) added via prisma/postgis.sql.
 // ---------------------------------------------------------------------------
 
 model CommuteRoute {
@@ -216,7 +216,7 @@ model WeeklyOffer {
 
 // ---------------------------------------------------------------------------
 // 5. weekly_requests
-// PostGIS geometry columns (pickup_geometry, dropoff_geometry) added via migration.
+// PostGIS geometry columns (pickup_geometry, dropoff_geometry) added via prisma/postgis.sql.
 // ---------------------------------------------------------------------------
 
 model WeeklyRequest {
@@ -297,11 +297,11 @@ model Booking {
   created_at                 DateTime      @default(now())
   updated_at                 DateTime      @updatedAt
 
-  match         Match          @relation(fields: [match_id], references: [id])
-  rider         User           @relation("RiderBookings", fields: [rider_id], references: [id])
-  owner         User           @relation("OwnerBookings", fields: [owner_id], references: [id])
-  trips         Trip[]
-  cancellations Cancellation[]
+  match           Match          @relation(fields: [match_id], references: [id])
+  rider           User           @relation("RiderBookings", fields: [rider_id], references: [id])
+  owner           User           @relation("OwnerBookings", fields: [owner_id], references: [id])
+  trips           Trip[]
+  cancellations   Cancellation[]
   support_tickets SupportTicket[]
 
   @@index([rider_id])
@@ -331,12 +331,12 @@ model Trip {
   created_at           DateTime      @default(now())
   updated_at           DateTime      @updatedAt
 
-  booking       Booking        @relation(fields: [booking_id], references: [id])
-  rider         User           @relation("RiderTrips", fields: [rider_id], references: [id])
-  owner         User           @relation("OwnerTrips", fields: [owner_id], references: [id])
-  contributions Contribution[]
-  ratings       Rating[]
-  cancellations Cancellation[]
+  booking         Booking        @relation(fields: [booking_id], references: [id])
+  rider           User           @relation("RiderTrips", fields: [rider_id], references: [id])
+  owner           User           @relation("OwnerTrips", fields: [owner_id], references: [id])
+  contributions   Contribution[]
+  ratings         Rating[]
+  cancellations   Cancellation[]
   support_tickets SupportTicket[]
 
   @@index([booking_id])
@@ -396,16 +396,16 @@ model Rating {
 // ---------------------------------------------------------------------------
 
 model Cancellation {
-  id                     String             @id @default(uuid())
-  booking_id             String?
-  trip_id                String?
-  cancelled_by_id        String
-  reason_code            CancellationReason
-  hours_before_departure Float // computed at time of cancellation
-  penalty_applied        Int                @default(0) // strikes added: 0, 1, or 2
-  dispute_raised         Boolean            @default(false)
-  dispute_resolved_at    DateTime?
-  created_at             DateTime           @default(now())
+  id                       String             @id @default(uuid())
+  booking_id               String?
+  trip_id                  String?
+  cancelled_by_id          String
+  reason_code              CancellationReason
+  minutes_before_departure Int // integer minutes before scheduled departure
+  penalty_applied          Int                @default(0) // strikes added: 0, 1, or 2
+  dispute_raised           Boolean            @default(false)
+  dispute_resolved_at      DateTime?
+  created_at               DateTime           @default(now())
 
   booking      Booking? @relation(fields: [booking_id], references: [id])
   trip         Trip?    @relation(fields: [trip_id], references: [id])
@@ -422,17 +422,17 @@ model Cancellation {
 // ---------------------------------------------------------------------------
 
 model SupportTicket {
-  id              String              @id @default(uuid())
-  raised_by_id    String
-  trip_id         String?
-  booking_id      String?
-  subject         String
-  description     String
-  status          SupportTicketStatus @default(OPEN)
-  resolved_at     DateTime?
-  resolved_by_id  String?
-  created_at      DateTime            @default(now())
-  updated_at      DateTime            @updatedAt
+  id             String              @id @default(uuid())
+  raised_by_id   String
+  trip_id        String?
+  booking_id     String?
+  subject        String
+  description    String
+  status         SupportTicketStatus @default(OPEN)
+  resolved_at    DateTime?
+  resolved_by_id String?
+  created_at     DateTime            @default(now())
+  updated_at     DateTime            @updatedAt
 
   raised_by   User     @relation("RaisedBy", fields: [raised_by_id], references: [id])
   resolved_by User?    @relation("ResolvedBy", fields: [resolved_by_id], references: [id])
@@ -471,12 +471,12 @@ model AuditLog {
 // ---------------------------------------------------------------------------
 
 model AdminFuelPrice {
-  id                   String   @id @default(uuid())
-  city                 String   @default("Hyderabad")
+  id                    String   @id @default(uuid())
+  city                  String   @default("Hyderabad")
   price_paise_per_litre Int // integer paise e.g. 10500 = ₹105.00/litre
-  effective_from       DateTime
-  created_by_id        String
-  created_at           DateTime @default(now())
+  effective_from        DateTime
+  created_by_id         String
+  created_at            DateTime @default(now())
 
   created_by User @relation("FuelPriceCreatedBy", fields: [created_by_id], references: [id])
 

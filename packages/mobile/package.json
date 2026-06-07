@@ -13,13 +13,13 @@
   },
   "dependencies": {
     "@commutepool/shared": "*",
-    "expo": "~51.0.0",
-    "expo-router": "~3.5.0",
-    "react": "18.2.0",
-    "react-native": "0.74.1"
+    "expo": "~52.0.0",
+    "expo-router": "~4.0.0",
+    "react": "18.3.1",
+    "react-native": "0.76.3"
   },
   "devDependencies": {
-    "@types/react": "~18.2.79",
+    "@types/react": "~18.3.0",
     "typescript": "^5.4.5"
   }
 }
