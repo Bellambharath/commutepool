@@ -11,7 +11,6 @@ import {
 import { requireAuth } from '../middleware/auth.js';
 import { prisma } from '../lib/prisma.js';
 import type { UserRole } from '@commutepool/shared';
-import '../types/hono.js';
 
 const PHONE_REGEX = /^\+91[6-9]\d{9}$/;
 
@@ -50,8 +49,6 @@ authRouter.post(
   zValidator('json', phoneSchema),
   async (c) => {
     const validationResult = c.req.valid('json');
-    // zValidator throws/returns before this handler if validation fails when
-    // no hook is provided — we use the hook pattern below for custom error shape.
     const { phone } = validationResult;
     const result = await requestOtp(phone);
 

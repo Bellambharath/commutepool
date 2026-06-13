@@ -2,9 +2,6 @@ import type { Context, MiddlewareHandler } from 'hono';
 import { verifyAccessToken } from '../services/jwt.js';
 import type { UserRole } from '@commutepool/shared';
 
-// Ensure the ContextVariableMap augmentation is loaded
-import '../types/hono.js';
-
 const ADMIN_PHONE = process.env['ADMIN_PHONE'] ?? '+919999999999';
 
 /**
@@ -52,7 +49,7 @@ export const requireAuth: MiddlewareHandler = async (c: Context, next) => {
       401,
     );
   }
-  await next();
+  return await next();
 };
 
 /** Middleware: requireAuth + checks that the authenticated user is the platform admin. */
@@ -78,5 +75,5 @@ export const requireAdmin: MiddlewareHandler = async (c: Context, next) => {
     );
   }
 
-  await next();
+  return await next();
 };
