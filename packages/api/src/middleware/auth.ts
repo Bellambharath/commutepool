@@ -9,62 +9,55 @@ export interface AuthVariables {
 
 const ADMIN_PHONE = process.env['ADMIN_PHONE'] ?? '+919999999999';
 
-/** Middleware: verifies the Bearer access token and attaches { userId, role } to context. */
-export const requireAuth: MiddlewareHandler = async (c: Context, next) => {
+/**
+ * Shared helper: reads and verifies the Bearer token from the Authorization header.
+ * On success, sets userId and role on context and returns the payload.
+ * On failure, writes a 401 JSON response and returns null.
+ */
+async function verifyBearer(
+  c: Context,
+): Promise<{ userId: string; role: UserRole } | null> {
   const authHeader = c.req.header('Authorization');
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json(
+    c.res = c.json(
       { success: false, data: null, error: 'Authorization header missing or malformed' },
       401,
-    );
+    ) as Response;
+    return null;
   }
 
   const token = authHeader.slice(7);
   const payload = verifyAccessToken(token);
 
   if (!payload) {
-    return c.json(
+    c.res = c.json(
       { success: false, data: null, error: 'Invalid or expired access token' },
       401,
-    );
+    ) as Response;
+    return null;
   }
 
   c.set('userId', payload.userId);
   c.set('role', payload.role);
 
+  return payload;
+}
+
+/** Middleware: verifies the Bearer access token and attaches { userId, role } to context. */
+export const requireAuth: MiddlewareHandler = async (c: Context, next) => {
+  const payload = await verifyBearer(c);
+  if (!payload) return;
   await next();
 };
 
 /** Middleware: requireAuth + checks that the authenticated user is the platform admin. */
 export const requireAdmin: MiddlewareHandler = async (c: Context, next) => {
-  // First run requireAuth inline
-  const authHeader = c.req.header('Authorization');
+  const payload = await verifyBearer(c);
+  if (!payload) return;
 
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json(
-      { success: false, data: null, error: 'Authorization header missing or malformed' },
-      401,
-    );
-  }
-
-  const token = authHeader.slice(7);
-  const payload = verifyAccessToken(token);
-
-  if (!payload) {
-    return c.json(
-      { success: false, data: null, error: 'Invalid or expired access token' },
-      401,
-    );
-  }
-
-  c.set('userId', payload.userId);
-  c.set('role', payload.role);
-
-  // Admin check: role must be BOTH (the seeded admin role) and userId must match admin record
-  // We do a lightweight DB lookup to avoid stale JWT role issues
   const { prisma } = await import('../lib/prisma.js');
-  const user = await prisma.users.findUnique({
+  const user = await prisma.user.findUnique({
     where: { id: payload.userId },
     select: { id: true, phone: true, deleted_at: true },
   });

@@ -108,7 +108,7 @@ authRouter.post(
     }
 
     // OTP verified — find or create user
-    let user = await prisma.users.findFirst({
+    let user = await prisma.user.findFirst({
       where: { phone, deleted_at: null },
     });
 
@@ -116,7 +116,7 @@ authRouter.post(
 
     if (!user) {
       isNewUser = true;
-      user = await prisma.users.create({
+      user = await prisma.user.create({
         data: {
           phone,
           name: '',
@@ -131,7 +131,7 @@ authRouter.post(
     const tokenHash = hashToken(rawRefreshToken);
     const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
-    await prisma.refresh_tokens.create({
+    await prisma.refreshToken.create({
       data: {
         user_id: user.id,
         token_hash: tokenHash,
@@ -185,7 +185,7 @@ authRouter.post(
     const tokenHash = hashToken(refreshToken);
     const now = new Date();
 
-    const storedToken = await prisma.refresh_tokens.findFirst({
+    const storedToken = await prisma.refreshToken.findFirst({
       where: {
         user_id: payload.userId,
         token_hash: tokenHash,
@@ -202,13 +202,13 @@ authRouter.post(
     }
 
     // Revoke old token (rotation)
-    await prisma.refresh_tokens.update({
+    await prisma.refreshToken.update({
       where: { id: storedToken.id },
       data: { revoked_at: now },
     });
 
     // Fetch user to embed current role in new access token
-    const user = await prisma.users.findUnique({
+    const user = await prisma.user.findUnique({
       where: { id: payload.userId },
       select: { id: true, role: true, deleted_at: true },
     });
@@ -225,7 +225,7 @@ authRouter.post(
     const newTokenHash = hashToken(newRawRefreshToken);
     const newExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
-    await prisma.refresh_tokens.create({
+    await prisma.refreshToken.create({
       data: {
         user_id: user.id,
         token_hash: newTokenHash,
@@ -250,11 +250,7 @@ authRouter.post(
 authRouter.post('/logout', requireAuth, async (c) => {
   const userId = c.get('userId') as string;
 
-  // Revoke ALL active refresh tokens for this user on logout
-  // (handles multiple-device logout or single-device depending on preference;
-  //  here we revoke all for safety — can be scoped to a specific token if
-  //  the client passes it in future)
-  await prisma.refresh_tokens.updateMany({
+  await prisma.refreshToken.updateMany({
     where: {
       user_id: userId,
       revoked_at: null,
