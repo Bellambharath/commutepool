@@ -97,7 +97,7 @@ usersRouter.post(
 // ---------------------------------------------------------------------------
 // GET /users/profile — fetch own profile with bike owner profile if exists
 // ---------------------------------------------------------------------------
-async function getProfileHandler(c: Parameters<typeof usersRouter.get>[1] extends (c: infer C) => unknown ? C : never) {
+usersRouter.get('/profile', async (c) => {
   const userId = c.get('userId');
 
   const user = await prisma.user.findFirst({
@@ -140,7 +140,52 @@ async function getProfileHandler(c: Parameters<typeof usersRouter.get>[1] extend
     },
     error: null,
   });
-}
+});
 
-usersRouter.get('/profile', (c) => getProfileHandler(c));
-usersRouter.get('/me', (c) => getProfileHandler(c));
+// ---------------------------------------------------------------------------
+// GET /users/me — alias for GET /users/profile
+// ---------------------------------------------------------------------------
+usersRouter.get('/me', async (c) => {
+  const userId = c.get('userId');
+
+  const user = await prisma.user.findFirst({
+    where: { id: userId, deleted_at: null },
+    select: {
+      id: true,
+      phone: true,
+      name: true,
+      photo_url: true,
+      role: true,
+      status: true,
+      emergency_contact_name: true,
+      emergency_contact_phone: true,
+      cancellation_strikes: true,
+      created_at: true,
+      updated_at: true,
+      bike_owner_profiles: {
+        select: {
+          bike_model: true,
+          verification_status: true,
+        },
+      },
+    },
+  });
+
+  if (!user) {
+    return c.json(
+      { success: false, data: null, error: 'User not found' },
+      404,
+    );
+  }
+
+  const { bike_owner_profiles, ...userFields } = user;
+
+  return c.json({
+    success: true,
+    data: {
+      user: userFields,
+      bikeOwnerProfile: bike_owner_profiles ?? null,
+    },
+    error: null,
+  });
+});
