@@ -107,25 +107,30 @@ model User {
   deleted_at              DateTime? // soft delete
 
   // Relations
-  bike_owner_profile  BikeOwnerProfile?
-  commute_routes      CommuteRoute[]
-  weekly_offers       WeeklyOffer[]      @relation("OwnerWeeklyOffers")
-  weekly_requests     WeeklyRequest[]    @relation("RiderWeeklyRequests")
-  bookings_as_rider   Booking[]          @relation("RiderBookings")
-  bookings_as_owner   Booking[]          @relation("OwnerBookings")
-  trips_as_rider      Trip[]             @relation("RiderTrips")
-  trips_as_owner      Trip[]             @relation("OwnerTrips")
-  contributions_rider Contribution[]     @relation("RiderContributions")
-  contributions_owner Contribution[]     @relation("OwnerContributions")
-  ratings_given       Rating[]           @relation("RaterRatings")
-  ratings_received    Rating[]           @relation("RateeRatings")
-  cancellations       Cancellation[]     @relation("CancelledBy")
-  support_tickets     SupportTicket[]    @relation("RaisedBy")
-  resolved_tickets    SupportTicket[]    @relation("ResolvedBy")
-  audit_logs          AuditLog[]         @relation("AdminAuditLogs")
-  fuel_prices         AdminFuelPrice[]   @relation("FuelPriceCreatedBy")
-  bike_mileages       AdminBikeMileage[] @relation("BikeMileageCreatedBy")
-  refresh_tokens      RefreshToken[]
+  bike_owner_profile     BikeOwnerProfile?
+  commute_routes         CommuteRoute[]
+  weekly_offers          WeeklyOffer[]        @relation("OwnerWeeklyOffers")
+  weekly_requests        WeeklyRequest[]      @relation("RiderWeeklyRequests")
+  bookings_as_rider      Booking[]            @relation("RiderBookings")
+  bookings_as_owner      Booking[]            @relation("OwnerBookings")
+  trips_as_rider         Trip[]               @relation("RiderTrips")
+  trips_as_owner         Trip[]               @relation("OwnerTrips")
+  contributions_rider    Contribution[]       @relation("RiderContributions")
+  contributions_owner    Contribution[]       @relation("OwnerContributions")
+  ratings_given          Rating[]             @relation("RaterRatings")
+  ratings_received       Rating[]             @relation("RateeRatings")
+  cancellations          Cancellation[]       @relation("CancelledBy")
+  support_tickets        SupportTicket[]      @relation("RaisedBy")
+  resolved_tickets       SupportTicket[]      @relation("ResolvedBy")
+  audit_logs             AuditLog[]           @relation("AdminAuditLogs")
+  fuel_prices            AdminFuelPrice[]     @relation("FuelPriceCreatedBy")
+  bike_mileages          AdminBikeMileage[]   @relation("BikeMileageCreatedBy")
+  refresh_tokens         RefreshToken[]
+  // v2 additions
+  device_tokens          DeviceToken[]
+  blocks_made            UserBlock[]          @relation("BlockerBlocks")
+  blocks_received        UserBlock[]          @relation("BlockedByBlocks")
+  force_majeure_windows  ForceMajeureWindow[] @relation("ForceMajeureDeclaredBy")
 
   @@map("users")
 }
@@ -156,28 +161,29 @@ model BikeOwnerProfile {
 // ---------------------------------------------------------------------------
 // 3. commute_routes
 // PostGIS geometry column (LINESTRING 4326) added via prisma/postgis.sql.
+// route_geometry populated by app code after decoding Google polyline in TS.
 // ---------------------------------------------------------------------------
 
 model CommuteRoute {
-  id                    String        @id @default(uuid())
-  user_id               String
-  period                CommutePeriod
-  encoded_polyline      String // Google Maps encoded polyline string
-  distance_meters       Int // integer metres
-  duration_seconds      Int // integer seconds
-  route_label           String?
-  is_primary            Boolean       @default(false)
-  source_place_id       String
-  source_lat            Float
-  source_lng            Float
-  source_address        String
-  destination_place_id  String
-  destination_lat       Float
-  destination_lng       Float
-  destination_address   String
-  is_active             Boolean       @default(true)
-  created_at            DateTime      @default(now())
-  updated_at            DateTime      @updatedAt
+  id                   String        @id @default(uuid())
+  user_id              String
+  period               CommutePeriod
+  encoded_polyline     String // Google Maps encoded polyline string
+  distance_meters      Int // integer metres
+  duration_seconds     Int // integer seconds
+  route_label          String?
+  is_primary           Boolean       @default(false)
+  source_place_id      String
+  source_lat           Float
+  source_lng           Float
+  source_address       String
+  destination_place_id String
+  destination_lat      Float
+  destination_lng      Float
+  destination_address  String
+  is_active            Boolean       @default(true)
+  created_at           DateTime      @default(now())
+  updated_at           DateTime      @updatedAt
 
   user          User          @relation(fields: [user_id], references: [id])
   weekly_offers WeeklyOffer[]
@@ -205,9 +211,9 @@ model WeeklyOffer {
   created_at             DateTime      @default(now())
   updated_at             DateTime      @updatedAt
 
-  owner    User         @relation("OwnerWeeklyOffers", fields: [owner_id], references: [id])
-  route    CommuteRoute @relation(fields: [route_id], references: [id])
-  matches  Match[]
+  owner   User         @relation("OwnerWeeklyOffers", fields: [owner_id], references: [id])
+  route   CommuteRoute @relation(fields: [route_id], references: [id])
+  matches Match[]
 
   @@index([owner_id])
   @@index([week_start_date, period, is_active])
@@ -216,14 +222,15 @@ model WeeklyOffer {
 
 // ---------------------------------------------------------------------------
 // 5. weekly_requests
-// PostGIS geometry columns (pickup_geometry, dropoff_geometry) added via prisma/postgis.sql.
+// PostGIS geometry columns (pickup_geometry, dropoff_geometry) added via
+// prisma/postgis.sql. Populated automatically by DB trigger wr_set_geometry.
 // ---------------------------------------------------------------------------
 
 model WeeklyRequest {
-  id                     String               @id @default(uuid())
+  id                     String              @id @default(uuid())
   rider_id               String
   period                 CommutePeriod
-  week_start_date        DateTime             @db.Date
+  week_start_date        DateTime            @db.Date
   days_needed            Int[]
   pickup_lat             Float
   pickup_lng             Float
@@ -235,9 +242,9 @@ model WeeklyRequest {
   dropoff_place_id       String
   departure_window_start String // HH:MM IST
   departure_window_end   String // HH:MM IST
-  status                 WeeklyRequestStatus  @default(OPEN)
-  created_at             DateTime             @default(now())
-  updated_at             DateTime             @updatedAt
+  status                 WeeklyRequestStatus @default(OPEN)
+  created_at             DateTime            @default(now())
+  updated_at             DateTime            @updatedAt
 
   rider   User    @relation("RiderWeeklyRequests", fields: [rider_id], references: [id])
   matches Match[]
@@ -252,26 +259,26 @@ model WeeklyRequest {
 // ---------------------------------------------------------------------------
 
 model Match {
-  id                        String   @id @default(uuid())
-  offer_id                  String
-  request_id                String
-  compatibility_score       Int // 0-100
-  detour_distance_meters    Int // integer metres
-  detour_cost_paise         Int // integer paise
-  base_contribution_paise   Int // integer paise
-  total_contribution_paise  Int // integer paise
-  pickup_point_lat          Float
-  pickup_point_lng          Float
-  pickup_walk_meters        Int
-  dropoff_point_lat         Float
-  dropoff_point_lng         Float
-  dropoff_walk_meters       Int
-  is_partial_route          Boolean  @default(false)
-  route_usage_percentage    Int // 0-100
-  created_at                DateTime @default(now())
+  id                       String   @id @default(uuid())
+  offer_id                 String
+  request_id               String
+  compatibility_score      Int // 0-100
+  detour_distance_meters   Int // integer metres
+  detour_cost_paise        Int // integer paise
+  base_contribution_paise  Int // integer paise
+  total_contribution_paise Int // integer paise
+  pickup_point_lat         Float
+  pickup_point_lng         Float
+  pickup_walk_meters       Int
+  dropoff_point_lat        Float
+  dropoff_point_lng        Float
+  dropoff_walk_meters      Int
+  is_partial_route         Boolean  @default(false)
+  route_usage_percentage   Int // 0-100
+  created_at               DateTime @default(now())
 
-  offer    WeeklyOffer    @relation(fields: [offer_id], references: [id])
-  request  WeeklyRequest  @relation(fields: [request_id], references: [id])
+  offer    WeeklyOffer   @relation(fields: [offer_id], references: [id])
+  request  WeeklyRequest @relation(fields: [request_id], references: [id])
   bookings Booking[]
 
   @@index([offer_id])
@@ -297,9 +304,9 @@ model Booking {
   created_at                 DateTime      @default(now())
   updated_at                 DateTime      @updatedAt
 
-  match           Match          @relation(fields: [match_id], references: [id])
-  rider           User           @relation("RiderBookings", fields: [rider_id], references: [id])
-  owner           User           @relation("OwnerBookings", fields: [owner_id], references: [id])
+  match           Match           @relation(fields: [match_id], references: [id])
+  rider           User            @relation("RiderBookings", fields: [rider_id], references: [id])
+  owner           User            @relation("OwnerBookings", fields: [owner_id], references: [id])
   trips           Trip[]
   cancellations   Cancellation[]
   support_tickets SupportTicket[]
@@ -315,25 +322,25 @@ model Booking {
 // ---------------------------------------------------------------------------
 
 model Trip {
-  id                   String        @id @default(uuid())
-  booking_id           String
-  rider_id             String
-  owner_id             String
-  scheduled_date       DateTime      @db.Date
-  scheduled_departure  String // HH:MM IST
-  period               CommutePeriod
-  status               TripStatus    @default(SCHEDULED)
-  actual_departure     DateTime?
-  actual_arrival       DateTime?
-  pickup_confirmed_at  DateTime?
-  sos_triggered_at     DateTime?
-  sos_resolved_at      DateTime?
-  created_at           DateTime      @default(now())
-  updated_at           DateTime      @updatedAt
+  id                  String        @id @default(uuid())
+  booking_id          String
+  rider_id            String
+  owner_id            String
+  scheduled_date      DateTime      @db.Date
+  scheduled_departure String // HH:MM IST
+  period              CommutePeriod
+  status              TripStatus    @default(SCHEDULED)
+  actual_departure    DateTime?
+  actual_arrival      DateTime?
+  pickup_confirmed_at DateTime?
+  sos_triggered_at    DateTime?
+  sos_resolved_at     DateTime?
+  created_at          DateTime      @default(now())
+  updated_at          DateTime      @updatedAt
 
-  booking         Booking        @relation(fields: [booking_id], references: [id])
-  rider           User           @relation("RiderTrips", fields: [rider_id], references: [id])
-  owner           User           @relation("OwnerTrips", fields: [owner_id], references: [id])
+  booking         Booking         @relation(fields: [booking_id], references: [id])
+  rider           User            @relation("RiderTrips", fields: [rider_id], references: [id])
+  owner           User            @relation("OwnerTrips", fields: [owner_id], references: [id])
   contributions   Contribution[]
   ratings         Rating[]
   cancellations   Cancellation[]
@@ -351,7 +358,7 @@ model Trip {
 // ---------------------------------------------------------------------------
 
 model Contribution {
-  id                    String                     @id @default(uuid())
+  id                    String                    @id @default(uuid())
   trip_id               String
   rider_id              String
   owner_id              String
@@ -359,7 +366,7 @@ model Contribution {
   payment_method        ContributionPaymentMethod
   marked_paid_at        DateTime? // owner marks received
   confirmed_by_rider_at DateTime? // rider confirms sent
-  created_at            DateTime                   @default(now())
+  created_at            DateTime                  @default(now())
 
   trip  Trip @relation(fields: [trip_id], references: [id])
   rider User @relation("RiderContributions", fields: [rider_id], references: [id])
@@ -535,4 +542,57 @@ model RefreshToken {
   @@index([user_id])
   @@index([token_hash])
   @@map("refresh_tokens")
+}
+
+// ---------------------------------------------------------------------------
+// 18. device_tokens  (v2)
+// ---------------------------------------------------------------------------
+
+model DeviceToken {
+  id           String   @id @default(uuid())
+  user_id      String
+  fcm_token    String   @unique
+  platform     String // "WEB" or "ANDROID"
+  last_seen_at DateTime @default(now())
+  created_at   DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [id])
+
+  @@index([user_id])
+  @@map("device_tokens")
+}
+
+// ---------------------------------------------------------------------------
+// 19. user_blocks  (v2)
+// ---------------------------------------------------------------------------
+
+model UserBlock {
+  id         String   @id @default(uuid())
+  blocker_id String
+  blocked_id String
+  reason     String?
+  created_at DateTime @default(now())
+
+  blocker User @relation("BlockerBlocks", fields: [blocker_id], references: [id])
+  blocked User @relation("BlockedByBlocks", fields: [blocked_id], references: [id])
+
+  @@unique([blocker_id, blocked_id])
+  @@index([blocker_id])
+  @@map("user_blocks")
+}
+
+// ---------------------------------------------------------------------------
+// 20. force_majeure_windows  (v2)
+// ---------------------------------------------------------------------------
+
+model ForceMajeureWindow {
+  id             String   @id @default(uuid())
+  date           DateTime @db.Date @unique
+  reason         String
+  declared_by_id String
+  created_at     DateTime @default(now())
+
+  declared_by User @relation("ForceMajeureDeclaredBy", fields: [declared_by_id], references: [id])
+
+  @@map("force_majeure_windows")
 }
