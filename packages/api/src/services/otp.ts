@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import { prisma } from '../lib/prisma.js';
 import { sendOtp } from './sms.js';
@@ -7,10 +8,9 @@ const OTP_EXPIRY_MINUTES = 5;
 const OTP_MAX_SEND_PER_HOUR = 3;
 const OTP_MAX_VERIFY_ATTEMPTS = 3;
 
-/** Generate a cryptographically random 6-digit OTP string. */
+/** Generate a cryptographically secure 6-digit OTP string. */
 export function generateOtp(): string {
-  const digits = Math.floor(100000 + Math.random() * 900000);
-  return String(digits);
+  return String(crypto.randomInt(100000, 1000000));
 }
 
 export type RequestOtpResult =
@@ -20,13 +20,16 @@ export type RequestOtpResult =
 
 /**
  * Request an OTP for the given phone number.
- * Enforces max 3 sends per phone per hour.
+ * Enforces max 3 sends per phone per hour (counted by created_at timestamp).
+ * Invalidates all previous unverified OTPs so only one is ever live.
  * Stores a bcrypt hash in otp_attempts with 5-minute expiry.
  */
 export async function requestOtp(phone: string): Promise<RequestOtpResult> {
   const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
 
-  const recentSends = await prisma.otpAttempts.count({
+  // Rate-limit: count sends in the last hour by created_at (unaffected by
+  // the invalidation below because we count rows regardless of verified status)
+  const recentSends = await prisma.otpAttempt.count({
     where: {
       phone,
       created_at: { gte: oneHourAgo },
@@ -34,8 +37,7 @@ export async function requestOtp(phone: string): Promise<RequestOtpResult> {
   });
 
   if (recentSends >= OTP_MAX_SEND_PER_HOUR) {
-    // Find the oldest qualifying record in the window to tell the client when to retry
-    const oldest = await prisma.otpAttempts.findFirst({
+    const oldest = await prisma.otpAttempt.findFirst({
       where: { phone, created_at: { gte: oneHourAgo } },
       orderBy: { created_at: 'asc' },
     });
@@ -45,11 +47,18 @@ export async function requestOtp(phone: string): Promise<RequestOtpResult> {
     return { success: false, error: 'RATE_LIMITED', retryAfterSeconds };
   }
 
+  // Fix 1: Invalidate all existing unverified OTPs for this phone so only
+  // one OTP is ever live at a time.
+  await prisma.otpAttempt.updateMany({
+    where: { phone, verified: false },
+    data: { verified: true },
+  });
+
   const otp = generateOtp();
   const otpHash = await bcrypt.hash(otp, OTP_BCRYPT_ROUNDS);
   const expiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
 
-  await prisma.otpAttempts.create({
+  await prisma.otpAttempt.create({
     data: {
       phone,
       otp_hash: otpHash,
@@ -76,8 +85,8 @@ export type VerifyOtpResult =
 /**
  * Verify the OTP submitted by the user.
  * Checks the latest unexpired, unverified otp_attempts row for the phone.
- * Increments attempt counter on each call; marks verified on success.
- * Max 3 verify attempts per OTP row.
+ * Increments attempt counter before comparing (prevents timing attacks).
+ * Marks verified: true on success.
  */
 export async function verifyOtp(
   phone: string,
@@ -85,7 +94,7 @@ export async function verifyOtp(
 ): Promise<VerifyOtpResult> {
   const now = new Date();
 
-  const attempt = await prisma.otpAttempts.findFirst({
+  const attempt = await prisma.otpAttempt.findFirst({
     where: {
       phone,
       verified: false,
@@ -102,8 +111,8 @@ export async function verifyOtp(
     return { success: false, error: 'MAX_ATTEMPTS_EXCEEDED' };
   }
 
-  // Increment the attempt counter first (prevents timing attacks from skipping this)
-  await prisma.otpAttempts.update({
+  // Increment attempt counter before comparing
+  await prisma.otpAttempt.update({
     where: { id: attempt.id },
     data: { attempts: attempt.attempts + 1 },
   });
@@ -117,7 +126,7 @@ export async function verifyOtp(
     return { success: false, error: 'INVALID_OR_EXPIRED' };
   }
 
-  await prisma.otpAttempts.update({
+  await prisma.otpAttempt.update({
     where: { id: attempt.id },
     data: { verified: true },
   });
