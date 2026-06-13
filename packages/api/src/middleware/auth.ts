@@ -2,10 +2,8 @@ import type { Context, MiddlewareHandler } from 'hono';
 import { verifyAccessToken } from '../services/jwt.js';
 import type { UserRole } from '@commutepool/shared';
 
-export interface AuthVariables {
-  userId: string;
-  role: UserRole;
-}
+// Ensure the ContextVariableMap augmentation is loaded
+import '../types/hono.js';
 
 const ADMIN_PHONE = process.env['ADMIN_PHONE'] ?? '+919999999999';
 
@@ -13,6 +11,7 @@ const ADMIN_PHONE = process.env['ADMIN_PHONE'] ?? '+919999999999';
  * Shared helper: reads and verifies the Bearer token from the Authorization header.
  * On success, sets userId and role on context and returns the payload.
  * On failure, writes a 401 JSON response and returns null.
+ * Every code path explicitly returns.
  */
 async function verifyBearer(
   c: Context,
@@ -20,10 +19,10 @@ async function verifyBearer(
   const authHeader = c.req.header('Authorization');
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    c.res = c.json(
+    await c.json(
       { success: false, data: null, error: 'Authorization header missing or malformed' },
       401,
-    ) as Response;
+    );
     return null;
   }
 
@@ -31,30 +30,40 @@ async function verifyBearer(
   const payload = verifyAccessToken(token);
 
   if (!payload) {
-    c.res = c.json(
+    await c.json(
       { success: false, data: null, error: 'Invalid or expired access token' },
       401,
-    ) as Response;
+    );
     return null;
   }
 
   c.set('userId', payload.userId);
   c.set('role', payload.role);
 
-  return payload;
+  return { userId: payload.userId, role: payload.role };
 }
 
 /** Middleware: verifies the Bearer access token and attaches { userId, role } to context. */
 export const requireAuth: MiddlewareHandler = async (c: Context, next) => {
   const payload = await verifyBearer(c);
-  if (!payload) return;
+  if (payload === null) {
+    return c.json(
+      { success: false, data: null, error: 'Unauthorized' },
+      401,
+    );
+  }
   await next();
 };
 
 /** Middleware: requireAuth + checks that the authenticated user is the platform admin. */
 export const requireAdmin: MiddlewareHandler = async (c: Context, next) => {
   const payload = await verifyBearer(c);
-  if (!payload) return;
+  if (payload === null) {
+    return c.json(
+      { success: false, data: null, error: 'Unauthorized' },
+      401,
+    );
+  }
 
   const { prisma } = await import('../lib/prisma.js');
   const user = await prisma.user.findUnique({

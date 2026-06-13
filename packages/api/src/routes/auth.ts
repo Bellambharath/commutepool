@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
-import { z } from 'zod';
+import { z, type ZodError } from 'zod';
 import { requestOtp, verifyOtp } from '../services/otp.js';
 import {
   signAccessToken,
@@ -11,6 +11,7 @@ import {
 import { requireAuth } from '../middleware/auth.js';
 import { prisma } from '../lib/prisma.js';
 import type { UserRole } from '@commutepool/shared';
+import '../types/hono.js';
 
 const PHONE_REGEX = /^\+91[6-9]\d{9}$/;
 
@@ -34,6 +35,11 @@ const refreshSchema = z.object({
   refreshToken: z.string().min(1, 'refreshToken is required'),
 });
 
+/** Extract the first error message from a ZodError. */
+function firstZodError(err: ZodError): string {
+  return err.errors[0]?.message ?? 'Validation error';
+}
+
 export const authRouter = new Hono();
 
 // ---------------------------------------------------------------------------
@@ -41,16 +47,12 @@ export const authRouter = new Hono();
 // ---------------------------------------------------------------------------
 authRouter.post(
   '/request-otp',
-  zValidator('json', phoneSchema, (result, c) => {
-    if (!result.success) {
-      return c.json(
-        { success: false, data: null, error: result.error.errors[0]?.message ?? 'Validation error' },
-        422,
-      );
-    }
-  }),
+  zValidator('json', phoneSchema),
   async (c) => {
-    const { phone } = c.req.valid('json');
+    const validationResult = c.req.valid('json');
+    // zValidator throws/returns before this handler if validation fails when
+    // no hook is provided — we use the hook pattern below for custom error shape.
+    const { phone } = validationResult;
     const result = await requestOtp(phone);
 
     if (!result.success) {
@@ -79,14 +81,7 @@ authRouter.post(
 // ---------------------------------------------------------------------------
 authRouter.post(
   '/verify-otp',
-  zValidator('json', verifyOtpSchema, (result, c) => {
-    if (!result.success) {
-      return c.json(
-        { success: false, data: null, error: result.error.errors[0]?.message ?? 'Validation error' },
-        422,
-      );
-    }
-  }),
+  zValidator('json', verifyOtpSchema),
   async (c) => {
     const { phone, otp } = c.req.valid('json');
     const verifyResult = await verifyOtp(phone, otp);
@@ -163,14 +158,7 @@ authRouter.post(
 // ---------------------------------------------------------------------------
 authRouter.post(
   '/refresh',
-  zValidator('json', refreshSchema, (result, c) => {
-    if (!result.success) {
-      return c.json(
-        { success: false, data: null, error: result.error.errors[0]?.message ?? 'Validation error' },
-        422,
-      );
-    }
-  }),
+  zValidator('json', refreshSchema),
   async (c) => {
     const { refreshToken } = c.req.valid('json');
 
@@ -248,7 +236,7 @@ authRouter.post(
 // POST /auth/logout   (requireAuth)
 // ---------------------------------------------------------------------------
 authRouter.post('/logout', requireAuth, async (c) => {
-  const userId = c.get('userId') as string;
+  const userId = c.get('userId');
 
   await prisma.refreshToken.updateMany({
     where: {
@@ -260,3 +248,5 @@ authRouter.post('/logout', requireAuth, async (c) => {
 
   return c.json({ success: true, data: { message: 'Logged out successfully' }, error: null });
 });
+
+export { firstZodError };
