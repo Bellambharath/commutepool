@@ -55,6 +55,22 @@ export enum CommutePeriod {
 }
 
 // ---------------------------------------------------------------------------
+// Geo primitives
+// ---------------------------------------------------------------------------
+
+export interface LatLng {
+  lat: number;
+  lng: number;
+}
+
+export interface RouteOption {
+  encodedPolyline: string;
+  distanceMeters: number;
+  durationSeconds: number;
+  routeLabel: string;
+}
+
+// ---------------------------------------------------------------------------
 // Core entity interfaces
 // ---------------------------------------------------------------------------
 
