@@ -4,6 +4,8 @@ import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 import { config } from './config/env.js';
 import { authRouter } from './routes/auth.js';
+import { usersRouter } from './routes/users.js';
+import { routesRouter } from './routes/routes.js';
 
 // Config is validated at import time — will throw and halt boot if vars are missing
 const app = new Hono();
@@ -36,6 +38,8 @@ app.get('/health', (c) =>
 // Routes
 // ---------------------------------------------------------------------------
 app.route('/auth', authRouter);
+app.route('/users', usersRouter);
+app.route('/routes', routesRouter);
 
 // ---------------------------------------------------------------------------
 // 404 fallback
