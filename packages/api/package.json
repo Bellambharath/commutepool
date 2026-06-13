@@ -5,14 +5,14 @@
   "main": "./dist/index.js",
   "scripts": {
     "build": "tsc",
-    "dev": "tsx watch src/index.ts",
+    "dev": "node --env-file=.env --import tsx src/index.ts",
     "lint": "tsc --noEmit",
     "type-check": "tsc --noEmit",
     "clean": "rm -rf dist",
     "db:init": "prisma migrate dev --name init",
     "db:postgis": "psql $DATABASE_URL -f prisma/postgis.sql",
     "db:generate": "prisma generate",
-    "db:seed": "tsx prisma/seed.ts",
+    "db:seed": "node --env-file=.env --import tsx prisma/seed.ts",
     "db:setup": "npm run db:init && npm run db:postgis && npm run db:generate && npm run db:seed",
     "db:studio": "prisma studio",
     "db:reset": "prisma migrate reset --force"
