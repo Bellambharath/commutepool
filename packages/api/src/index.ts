@@ -6,6 +6,8 @@ import { config } from './config/env.js';
 import { authRouter } from './routes/auth.js';
 import { usersRouter } from './routes/users.js';
 import { routesRouter } from './routes/routes.js';
+import { offersRouter } from './routes/offers.js';
+import { requestsRouter } from './routes/requests.js';
 
 // Config is validated at import time — will throw and halt boot if vars are missing
 const app = new Hono();
@@ -40,6 +42,8 @@ app.get('/health', (c) =>
 app.route('/auth', authRouter);
 app.route('/users', usersRouter);
 app.route('/routes', routesRouter);
+app.route('/offers', offersRouter);
+app.route('/requests', requestsRouter);
 
 // ---------------------------------------------------------------------------
 // 404 fallback
