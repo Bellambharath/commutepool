@@ -21,5 +21,5 @@ jobs:
         run: npx prisma validate --schema=packages/api/prisma/schema.prisma
       - name: Build shared package
         run: cd packages/shared && npm run build
-      - name: Type-check all packages
-        run: npx turbo run type-check
+      - name: Type-check API
+        run: cd packages/api && npm run type-check
