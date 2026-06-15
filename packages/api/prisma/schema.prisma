@@ -218,6 +218,7 @@ model WeeklyOffer {
 
   @@index([owner_id])
   @@index([week_start_date, period, is_active])
+  @@unique([owner_id, route_id, period, week_start_date])
   @@map("weekly_offers")
 }
 
@@ -244,6 +245,7 @@ model WeeklyRequest {
   departure_window_start String // HH:MM IST
   departure_window_end   String // HH:MM IST
   status                 WeeklyRequestStatus @default(OPEN)
+  deleted_at             DateTime?
   created_at             DateTime            @default(now())
   updated_at             DateTime            @updatedAt
 

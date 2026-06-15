@@ -93,3 +93,28 @@ export function getWeekStartMonday(d: Date): string {
 
   return `${yyyy}-${mm}-${dd}`;
 }
+
+/**
+ * True iff the moment falls within the posting window:
+ * Sunday 18:00 IST (inclusive) → Friday 23:00 IST (inclusive).
+ */
+export function isWithinPostingWindow(d: Date = new Date()): boolean {
+  const istMs = d.getTime() + IST_OFFSET_MINUTES * 60 * 1000;
+  const ist = new Date(istMs);
+  const dow = ist.getUTCDay();
+  const totalMinutes = ist.getUTCHours() * 60 + ist.getUTCMinutes();
+  if (dow === 6) return false;
+  if (dow === 0) return totalMinutes >= 18 * 60;
+  if (dow >= 1 && dow <= 4) return true;
+  return totalMinutes <= 23 * 60;
+}
+
+/**
+ * True iff the ISO date string (YYYY-MM-DD) is a Monday in the IST calendar.
+ */
+export function isMondayIST(isoDate: string): boolean {
+  const ms = Date.parse(isoDate + 'T00:00:00Z');
+  if (Number.isNaN(ms)) return false;
+  const ist = new Date(ms + IST_OFFSET_MINUTES * 60 * 1000);
+  return ist.getUTCDay() === 1;
+}

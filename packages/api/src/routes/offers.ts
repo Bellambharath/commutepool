@@ -3,7 +3,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { requireAuth } from '../middleware/auth.js';
 import { prisma } from '../lib/prisma.js';
-import { getWeekStartMonday } from '@commutepool/shared';
+import { isWithinPostingWindow, isMondayIST } from '@commutepool/shared';
 
 export const offersRouter = new Hono();
 
@@ -14,54 +14,6 @@ offersRouter.use('*', requireAuth);
 // ---------------------------------------------------------------------------
 
 const HHMM_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/;
-const IST_OFFSET_MS = 330 * 60 * 1000; // UTC+5:30
-
-/**
- * Returns true when the current moment falls inside the posting window:
- * Sunday 18:00 IST (inclusive) → Friday 23:00 IST (inclusive).
- *
- * IST day-of-week: 0=Sun, 1=Mon … 6=Sat
- * Sunday  18:00–23:59 IST → open
- * Monday  00:00–23:59 IST → open
- * Tuesday 00:00–23:59 IST → open
- * Wednesday 00:00–23:59 IST → open
- * Thursday  00:00–23:59 IST → open
- * Friday  00:00–23:00 IST → open
- * Friday  23:01–23:59 IST → closed
- * Saturday  00:00–23:59 IST → closed
- */
-function isWithinPostingWindow(): boolean {
-  const now = new Date();
-  const istMs = now.getTime() + IST_OFFSET_MS;
-  const ist = new Date(istMs);
-  const dow = ist.getUTCDay(); // 0=Sun…6=Sat
-  const hour = ist.getUTCHours();
-  const minute = ist.getUTCMinutes();
-  const totalMinutes = hour * 60 + minute;
-
-  // Saturday — always closed
-  if (dow === 6) return false;
-  // Sunday — open from 18:00 (1080 min) onward
-  if (dow === 0) return totalMinutes >= 18 * 60;
-  // Mon–Thu — always open
-  if (dow >= 1 && dow <= 4) return true;
-  // Friday — open until 23:00 (1380 min) inclusive, i.e. 23:00 = 1380 min exactly
-  // "closes Friday 23:00 IST" means last allowed minute is 23:00:00
-  return totalMinutes <= 23 * 60;
-}
-
-/**
- * Returns true iff the given ISO date string (YYYY-MM-DD) is a Monday
- * in the IST calendar.
- */
-function isMonday(isoDate: string): boolean {
-  // Parse as midnight UTC then shift to IST to read IST day-of-week.
-  const ms = Date.parse(isoDate + 'T00:00:00Z');
-  if (Number.isNaN(ms)) return false;
-  const istMs = ms + IST_OFFSET_MS;
-  const ist = new Date(istMs);
-  return ist.getUTCDay() === 1; // 1 = Monday
-}
 
 // ---------------------------------------------------------------------------
 // Validation schema
@@ -105,6 +57,7 @@ offersRouter.post(
         422,
       );
     }
+    return undefined;
   }),
   async (c) => {
     const userId = c.get('userId');
@@ -141,7 +94,7 @@ offersRouter.post(
     }
 
     // 3. week_start_date must be a Monday
-    if (!isMonday(body.weekStartDate)) {
+    if (!isMondayIST(body.weekStartDate)) {
       return c.json(
         {
           success: false,
@@ -185,10 +138,7 @@ offersRouter.post(
         },
       });
     } catch (err: unknown) {
-      // Unique constraint violation from DB
-      const msg =
-        err instanceof Error ? err.message : '';
-      if (msg.includes('unique') || msg.includes('duplicate') || (err as { code?: string }).code === 'P2002') {
+      if ((err as { code?: string }).code === 'P2002') {
         return c.json(
           { success: false, data: null, error: 'Duplicate offer for this week' },
           409,

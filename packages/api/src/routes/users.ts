@@ -114,7 +114,7 @@ usersRouter.get('/profile', async (c) => {
       cancellation_strikes: true,
       created_at: true,
       updated_at: true,
-      bike_owner_profiles: {
+      bike_owner_profile: {
         select: {
           bike_model: true,
           verification_status: true,
@@ -130,13 +130,13 @@ usersRouter.get('/profile', async (c) => {
     );
   }
 
-  const { bike_owner_profiles, ...userFields } = user;
+  const { bike_owner_profile, ...userFields } = user;
 
   return c.json({
     success: true,
     data: {
       user: userFields,
-      bikeOwnerProfile: bike_owner_profiles ?? null,
+      bikeOwnerProfile: bike_owner_profile ?? null,
     },
     error: null,
   });
@@ -162,7 +162,7 @@ usersRouter.get('/me', async (c) => {
       cancellation_strikes: true,
       created_at: true,
       updated_at: true,
-      bike_owner_profiles: {
+      bike_owner_profile: {
         select: {
           bike_model: true,
           verification_status: true,
@@ -178,13 +178,13 @@ usersRouter.get('/me', async (c) => {
     );
   }
 
-  const { bike_owner_profiles, ...userFields } = user;
+  const { bike_owner_profile, ...userFields } = user;
 
   return c.json({
     success: true,
     data: {
       user: userFields,
-      bikeOwnerProfile: bike_owner_profiles ?? null,
+      bikeOwnerProfile: bike_owner_profile ?? null,
     },
     error: null,
   });

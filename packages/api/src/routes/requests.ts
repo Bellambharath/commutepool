@@ -3,7 +3,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { requireAuth } from '../middleware/auth.js';
 import { prisma } from '../lib/prisma.js';
-
+import { isWithinPostingWindow, isMondayIST } from '@commutepool/shared';
 export const requestsRouter = new Hono();
 
 requestsRouter.use('*', requireAuth);
@@ -13,31 +13,8 @@ requestsRouter.use('*', requireAuth);
 // ---------------------------------------------------------------------------
 
 const HHMM_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/;
-const IST_OFFSET_MS = 330 * 60 * 1000;
 
-/**
- * Posting window: Sunday 18:00 IST – Friday 23:00 IST.
- * Identical logic to offers.ts — kept local so each file is self-contained.
- */
-function isWithinPostingWindow(): boolean {
-  const now = new Date();
-  const istMs = now.getTime() + IST_OFFSET_MS;
-  const ist = new Date(istMs);
-  const dow = ist.getUTCDay();
-  const totalMinutes = ist.getUTCHours() * 60 + ist.getUTCMinutes();
 
-  if (dow === 6) return false;
-  if (dow === 0) return totalMinutes >= 18 * 60;
-  if (dow >= 1 && dow <= 4) return true;
-  return totalMinutes <= 23 * 60; // Friday
-}
-
-function isMonday(isoDate: string): boolean {
-  const ms = Date.parse(isoDate + 'T00:00:00Z');
-  if (Number.isNaN(ms)) return false;
-  const ist = new Date(ms + IST_OFFSET_MS);
-  return ist.getUTCDay() === 1;
-}
 
 // ---------------------------------------------------------------------------
 // Validation schema
@@ -93,6 +70,7 @@ requestsRouter.post(
         422,
       );
     }
+    return undefined;
   }),
   async (c) => {
     const userId = c.get('userId');
@@ -129,7 +107,7 @@ requestsRouter.post(
     }
 
     // 3. week_start_date must be a Monday
-    if (!isMonday(body.weekStartDate)) {
+    if (!isMondayIST(body.weekStartDate)) {
       return c.json(
         {
           success: false,
@@ -196,12 +174,7 @@ requestsRouter.get('/', async (c) => {
   const requests = await prisma.weeklyRequest.findMany({
     where: {
       rider_id: userId,
-      // WeeklyRequest has no deleted_at — use status != EXPIRED as soft filter,
-      // but the spec says GET excludes deleted_at IS NOT NULL. Since WeeklyRequest
-      // has no deleted_at, we expose all non-expired records for the user.
-      // The spec's soft-delete for requests is implemented via DELETE /:id below
-      // which we model as status = 'EXPIRED' (closest available tombstone).
-      status: { not: 'EXPIRED' },
+      deleted_at: null,
       ...(weekFilter ? { week_start_date: weekFilter } : {}),
     },
     orderBy: [
@@ -214,7 +187,7 @@ requestsRouter.get('/', async (c) => {
 });
 
 // ---------------------------------------------------------------------------
-// DELETE /requests/:id — soft delete: set status = EXPIRED
+// DELETE /requests/:id — soft delete: 
 // WeeklyRequest has no deleted_at column. The closest available tombstone in
 // the schema is status = EXPIRED (WeeklyRequestStatus enum). This hides the
 // record from GET /requests without hard-deleting it.
@@ -227,7 +200,7 @@ requestsRouter.delete('/:id', async (c) => {
     where: {
       id: requestId,
       rider_id: userId,
-      status: { not: 'EXPIRED' },
+      deleted_at: null,
     },
     select: { id: true },
   });
@@ -245,7 +218,7 @@ requestsRouter.delete('/:id', async (c) => {
 
   await prisma.weeklyRequest.update({
     where: { id: requestId },
-    data: { status: 'EXPIRED' },
+    data: { deleted_at: new Date() },
   });
 
   return c.json({ success: true, data: null, error: null });
