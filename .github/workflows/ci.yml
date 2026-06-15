@@ -1,11 +1,9 @@
 name: CI
-
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
-
 jobs:
   validate:
     runs-on: ubuntu-latest
@@ -14,16 +12,14 @@ jobs:
       DIRECT_URL: ${{ secrets.DIRECT_URL }}
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-
       - name: Install dependencies
         run: npm install --legacy-peer-deps
-
       - name: Validate Prisma schema
         run: npx prisma validate --schema=packages/api/prisma/schema.prisma
-
+      - name: Build shared package
+        run: cd packages/shared && npm run build
       - name: Type-check all packages
         run: npx turbo run type-check
