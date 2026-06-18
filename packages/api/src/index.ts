@@ -2,12 +2,15 @@ import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
+import cron from 'node-cron';
 import { config } from './config/env.js';
 import { authRouter } from './routes/auth.js';
 import { usersRouter } from './routes/users.js';
 import { routesRouter } from './routes/routes.js';
 import { offersRouter } from './routes/offers.js';
 import { requestsRouter } from './routes/requests.js';
+import { runMatcher } from './services/matching.js';
+import { getCurrentISTWeekStartDate } from '@commutepool/shared';
 
 // Config is validated at import time — will throw and halt boot if vars are missing
 const app = new Hono();
@@ -62,6 +65,26 @@ app.onError((err, c) => {
     500,
   );
 });
+
+// ---------------------------------------------------------------------------
+// Nightly matching batch — 22:00 IST every day
+// node-cron handles the Asia/Kolkata timezone; no manual UTC offset arithmetic.
+// ---------------------------------------------------------------------------
+cron.schedule(
+  '0 22 * * *',
+  () => {
+    const weekStart = getCurrentISTWeekStartDate();
+    console.log(`[Cron] Nightly matcher starting — week=${weekStart.toISOString()}`);
+    for (const period of ['MORNING', 'EVENING'] as const) {
+      runMatcher({ type: 'batch', weekStartDate: weekStart, period }).catch(
+        (err: unknown) => {
+          console.error(`[Cron] Matcher failed for period=${period}:`, err);
+        },
+      );
+    }
+  },
+  { timezone: 'Asia/Kolkata' },
+);
 
 // ---------------------------------------------------------------------------
 // Start server

@@ -4,6 +4,8 @@ import { z } from 'zod';
 import { requireAuth } from '../middleware/auth.js';
 import { prisma } from '../lib/prisma.js';
 import { isWithinPostingWindow, isMondayIST } from '@commutepool/shared';
+import { runMatcher } from '../services/matching.js';
+
 export const requestsRouter = new Hono();
 
 requestsRouter.use('*', requireAuth);
@@ -13,8 +15,6 @@ requestsRouter.use('*', requireAuth);
 // ---------------------------------------------------------------------------
 
 const HHMM_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/;
-
-
 
 // ---------------------------------------------------------------------------
 // Validation schema
@@ -142,6 +142,12 @@ requestsRouter.post(
       },
     });
 
+    // 5. On-demand match for this new request — fire and await in background;
+    //    a match failure must never fail the POST response.
+    runMatcher({ type: 'request', requestId: request.id }).catch((err: unknown) => {
+      console.error(`[Matcher] On-demand match failed for request=${request.id}:`, err);
+    });
+
     return c.json(
       { success: true, data: { request }, error: null },
       201,
@@ -187,10 +193,7 @@ requestsRouter.get('/', async (c) => {
 });
 
 // ---------------------------------------------------------------------------
-// DELETE /requests/:id — soft delete: 
-// WeeklyRequest has no deleted_at column. The closest available tombstone in
-// the schema is status = EXPIRED (WeeklyRequestStatus enum). This hides the
-// record from GET /requests without hard-deleting it.
+// DELETE /requests/:id — soft delete
 // ---------------------------------------------------------------------------
 requestsRouter.delete('/:id', async (c) => {
   const userId = c.get('userId');

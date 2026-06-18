@@ -284,6 +284,7 @@ model Match {
   request  WeeklyRequest @relation(fields: [request_id], references: [id])
   bookings Booking[]
 
+  @@unique([offer_id, request_id])
   @@index([offer_id])
   @@index([request_id])
   @@map("matches")

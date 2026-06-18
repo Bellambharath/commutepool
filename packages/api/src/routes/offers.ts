@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { requireAuth } from '../middleware/auth.js';
 import { prisma } from '../lib/prisma.js';
 import { isWithinPostingWindow, isMondayIST } from '@commutepool/shared';
+import { runMatcher } from '../services/matching.js';
 
 export const offersRouter = new Hono();
 
@@ -146,6 +147,12 @@ offersRouter.post(
       }
       throw err;
     }
+
+    // 6. On-demand match for this new offer — fire and await in background;
+    //    a match failure must never fail the POST response.
+    runMatcher({ type: 'offer', offerId: offer.id }).catch((err: unknown) => {
+      console.error(`[Matcher] On-demand match failed for offer=${offer.id}:`, err);
+    });
 
     return c.json(
       { success: true, data: { offer }, error: null },
