@@ -82,7 +82,7 @@ export async function runMatcher(scope: MatcherScope): Promise<void> {
   //    ST_Distance with ::geography also returns metres.
   //    ST_ClosestPoint operates on geometry (degrees) then we extract coords.
   //    ST_LineLocatePoint operates on geometry — returns 0..1 fraction.
-  const candidates = await prisma.$queryRawUnsafe<CandidateRow[]>(
+  const candidates = (await prisma.$queryRawUnsafe(
     `
     SELECT
       wo.id                                                           AS offer_id,
@@ -137,8 +137,8 @@ export async function runMatcher(scope: MatcherScope): Promise<void> {
       AND ST_LineLocatePoint(cr.route_geometry, wr.pickup_geometry)
             < ST_LineLocatePoint(cr.route_geometry, wr.dropoff_geometry)
     `,
-    ...scopeParams,
-  );
+   ...scopeParams,
+  )) as CandidateRow[];
 
   if (candidates.length === 0) {
     console.log(`[Matcher] No candidates found for scope: ${JSON.stringify(scope)}`);
