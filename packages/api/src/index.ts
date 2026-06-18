@@ -10,7 +10,7 @@ import { routesRouter } from './routes/routes.js';
 import { offersRouter } from './routes/offers.js';
 import { requestsRouter } from './routes/requests.js';
 import { runMatcher } from './services/matching.js';
-import { getCurrentISTWeekStartDate } from '@commutepool/shared';
+import { getWeekStartMonday } from '@commutepool/shared';
 
 // Config is validated at import time — will throw and halt boot if vars are missing
 const app = new Hono();
@@ -73,14 +73,26 @@ app.onError((err, c) => {
 cron.schedule(
   '0 22 * * *',
   () => {
-    const weekStart = getCurrentISTWeekStartDate();
-    console.log(`[Cron] Nightly matcher starting — week=${weekStart.toISOString()}`);
-    for (const period of ['MORNING', 'EVENING'] as const) {
-      runMatcher({ type: 'batch', weekStartDate: weekStart, period }).catch(
-        (err: unknown) => {
-          console.error(`[Cron] Matcher failed for period=${period}:`, err);
-        },
-      );
+    const now = new Date();
+    // Cover the current week and (on Sunday) the upcoming week the posting
+    // window now serves. getWeekStartMonday handles IST internally; the
+    // 'T00:00:00Z' conversion matches how offers/requests store week_start_date.
+    const weekStrs = Array.from(
+      new Set([
+        getWeekStartMonday(now),
+        getWeekStartMonday(new Date(now.getTime() + 24 * 60 * 60 * 1000)),
+      ]),
+    );
+    for (const ws of weekStrs) {
+      const weekStart = new Date(ws + 'T00:00:00Z');
+      console.log(`[Cron] Nightly matcher starting — week=${ws}`);
+      for (const period of ['MORNING', 'EVENING'] as const) {
+        runMatcher({ type: 'batch', weekStartDate: weekStart, period }).catch(
+          (err: unknown) => {
+            console.error(`[Cron] Matcher failed week=${ws} period=${period}:`, err);
+          },
+        );
+      }
     }
   },
   { timezone: 'Asia/Kolkata' },
