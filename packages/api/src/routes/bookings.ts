@@ -293,13 +293,22 @@ bookingsRouter.post('/:id/accept', async (c) => {
     );
   }
 
-  // RULE 8: update booking status first
+// RULE 8: update booking status first
   const updatedBooking = await prisma.booking.update({
     where: { id: bookingId },
     data: {
       status: 'ACCEPTED',
       responded_at: now,
     },
+  });
+
+  // Close the request now that it has an accepted booking. This prevents the
+  // matcher (matching.ts, which filters wr.status = 'OPEN') from creating any
+  // further matches against this request, and stops a second rider from being
+  // able to book the same commute slot via a different match.
+  await prisma.weeklyRequest.update({
+    where: { id: booking.match.request_id },
+    data: { status: 'MATCHED' },
   });
 
   // RULE 8: create one Trip per confirmed day
