@@ -9,7 +9,7 @@ const OTP_RE = /^\d{6}$/;
 type Step = 'phone' | 'otp';
 
 export default function LoginPage() {
-  const { status, requestOtp, verifyOtp } = useAuth();
+  const { status, user, requestOtp, verifyOtp } = useAuth();
   const router = useRouter();
 
   const [step, setStep] = useState<Step>('phone');
@@ -19,9 +19,20 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [retryAfter, setRetryAfter] = useState<number | null>(null);
 
+  // Single redirect authority for this page.
+  // Handles BOTH cases:
+  //   1. Returning user — bootstrap() resolves to 'authed' -> effect fires.
+  //   2. Just-verified user — verifyOtp() sets status='authed'+user -> same effect fires.
+  // user.status === 'PENDING' is true for every new user (backend creates as PENDING),
+  // so this correctly sends new/incomplete users to /profile-setup.
   useEffect(() => {
-    if (status === 'authed') router.replace('/home');
-  }, [status, router]);
+    if (status !== 'authed' || !user) return;
+    if (user.status === 'PENDING') {
+      router.replace('/profile-setup');
+    } else {
+      router.replace('/home');
+    }
+  }, [status, user, router]);
 
   useEffect(() => {
     if (retryAfter === null || retryAfter <= 0) return;
@@ -61,14 +72,10 @@ export default function LoginPage() {
     setLoading(true);
     const res = await verifyOtp(phone.trim(), otp.trim());
     setLoading(false);
-    if (res.success && res.data) {
-      const { isNewUser, user } = res.data;
-      if (isNewUser || user.status === 'PENDING') {
-        router.replace('/profile-setup');
-      } else {
-        router.replace('/home');
-      }
-    } else {
+    // Routing is handled entirely by the useEffect above which reacts to
+    // the status + user changes that verifyOtp() sets on the context.
+    // This function only handles the error case.
+    if (!res.success) {
       setError(res.error ?? 'Incorrect OTP. Please try again.');
     }
   }
