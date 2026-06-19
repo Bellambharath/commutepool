@@ -114,10 +114,10 @@ bookingsRouter.post(
 
     // RULE 3: daysConfirmed must be a non-empty subset of the intersection of
     //         days_available ∩ days_needed
-    const intersection = match.offer.days_available.filter((d) =>
+    const intersection = match.offer.days_available.filter((d: number) =>
       match.request.days_needed.includes(d),
     );
-    const invalidDays = body.daysConfirmed.filter((d) => !intersection.includes(d));
+    const invalidDays = body.daysConfirmed.filter((d: number) => !intersection.includes(d));
     if (invalidDays.length > 0) {
       return c.json(
         {
