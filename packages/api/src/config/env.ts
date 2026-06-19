@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+const PHONE_REGEX = /^\+91[6-9]\d{9}$/;
+
 const envSchema = z.object({
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
   DIRECT_URL: z.string().min(1, 'DIRECT_URL is required'),
@@ -7,6 +9,9 @@ const envSchema = z.object({
   JWT_REFRESH_SECRET: z.string().min(32, 'JWT_REFRESH_SECRET must be at least 32 characters'),
   FAST2SMS_API_KEY: z.string().min(1, 'FAST2SMS_API_KEY is required'),
   GOOGLE_MAPS_API_KEY: z.string().min(1, 'GOOGLE_MAPS_API_KEY is required'),
+  ADMIN_SOS_PHONE: z
+    .string()
+    .regex(PHONE_REGEX, 'ADMIN_SOS_PHONE must be a valid Indian mobile number (+91[6-9]XXXXXXXXX)'),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   PORT: z
     .string()

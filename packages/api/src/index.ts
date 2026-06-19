@@ -10,6 +10,8 @@ import { routesRouter } from './routes/routes.js';
 import { offersRouter } from './routes/offers.js';
 import { requestsRouter } from './routes/requests.js';
 import { bookingsRouter } from './routes/bookings.js';
+import { tripsRouter } from './routes/trips.js';
+import { contributionsRouter } from './routes/contributions.js';
 import { runMatcher } from './services/matching.js';
 import { getWeekStartMonday } from '@commutepool/shared';
 
@@ -49,6 +51,8 @@ app.route('/routes', routesRouter);
 app.route('/offers', offersRouter);
 app.route('/requests', requestsRouter);
 app.route('/bookings', bookingsRouter);
+app.route('/trips', tripsRouter);
+app.route('/contributions', contributionsRouter);
 
 // ---------------------------------------------------------------------------
 // 404 fallback
@@ -76,9 +80,6 @@ cron.schedule(
   '0 22 * * *',
   () => {
     const now = new Date();
-    // Cover the current week and (on Sunday) the upcoming week the posting
-    // window now serves. getWeekStartMonday handles IST internally; the
-    // 'T00:00:00Z' conversion matches how offers/requests store week_start_date.
     const weekStrs = Array.from(
       new Set([
         getWeekStartMonday(now),
