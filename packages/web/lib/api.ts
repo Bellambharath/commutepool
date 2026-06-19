@@ -3,6 +3,11 @@
  * - Always credentials: 'include' so the httpOnly refresh_token cookie flows.
  * - Authenticated requests pass accessToken as Authorization: Bearer.
  * - withAuth() does one silent /auth/refresh retry on 401 before giving up.
+ *   Retry is keyed on HTTP status 401, not on any particular error string,
+ *   so it handles all three middleware variants:
+ *     'Authorization header missing or malformed'
+ *     'Invalid or expired access token'
+ *     'Unauthorized'
  */
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3000';
@@ -11,6 +16,8 @@ export interface ApiResponse<T> {
   success: boolean;
   data: T | null;
   error: string | null;
+  /** HTTP status code. 0 means a network/transport error (no response received). */
+  status: number;
 }
 
 interface FetchOptions extends RequestInit {
@@ -36,10 +43,10 @@ export async function apiFetch<T>(
       credentials: 'include',
     });
 
-    const json = (await res.json()) as ApiResponse<T>;
-    return json;
+    const json = (await res.json()) as Omit<ApiResponse<T>, 'status'>;
+    return { ...json, status: res.status };
   } catch {
-    return { success: false, data: null, error: 'Network error — please check your connection.' };
+    return { success: false, data: null, error: 'Network error — please check your connection.', status: 0 };
   }
 }
 
@@ -137,13 +144,21 @@ export async function logout(accessToken: string): Promise<ApiResponse<{ message
 // 401-retry helper
 // ---------------------------------------------------------------------------
 
+/**
+ * Calls fn(currentToken). If the response has HTTP status 401 — regardless
+ * of which error string the middleware returned — silently calls
+ * POST /auth/refresh once, then replays fn with the new token.
+ *
+ * Returns the final ApiResponse plus the new token if a refresh occurred
+ * (so the caller can update in-memory state).
+ */
 export async function withAuth<T>(
   currentToken: string,
   fn: (token: string) => Promise<ApiResponse<T>>,
 ): Promise<{ result: ApiResponse<T>; newAccessToken: string | null }> {
   const first = await fn(currentToken);
 
-  if (first.success || first.error !== 'Unauthorized') {
+  if (first.status !== 401) {
     return { result: first, newAccessToken: null };
   }
 

@@ -14,6 +14,7 @@ import {
   refreshAccessToken,
   getMe,
   logout as apiLogout,
+  withAuth,
   type MeUser,
   type ApiResponse,
   type VerifyOtpData,
@@ -61,10 +62,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const token = refreshRes.data.accessToken;
       setAccessTokenState(token);
 
-      const meRes = await getMe(token);
+      // Use withAuth so that if the freshly-issued access token is somehow
+      // already stale (clock skew, very short TTL), we do one silent retry
+      // before giving up. If withAuth had to refresh again, store the newer
+      // token so the rest of the session uses it.
+      const { result: meRes, newAccessToken } = await withAuth(token, getMe);
+
+      if (newAccessToken) {
+        setAccessTokenState(newAccessToken);
+      }
+
       if (meRes.success && meRes.data) {
         setUserState(meRes.data.user);
       }
+
       setStatus('authed');
     }
 
