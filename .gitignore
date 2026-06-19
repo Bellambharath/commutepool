@@ -43,3 +43,5 @@ Thumbs.db
 *.swo
 *.tsbuildinfo
 *.tsbuildinfo
+
+next-env.d.ts
