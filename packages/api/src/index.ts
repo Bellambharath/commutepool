@@ -27,8 +27,8 @@ app.use(
   cors({
     origin:
       config.NODE_ENV === 'production'
-        ? ['https://commutepool.in', 'https://www.commutepool.in']
-        : '*',
+        ? ['https://app.commutepool.pghive.in']
+        : ['http://localhost:3001', 'http://localhost:3000'],
     allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowHeaders: ['Content-Type', 'Authorization'],
     credentials: true,
