@@ -70,6 +70,14 @@ export interface RouteOption {
   routeLabel: string;
 }
 
+export interface PlaceSuggestion {
+  placeId: string;
+  displayName: string;
+  formattedAddress: string;
+  lat: number;
+  lng: number;
+}
+
 // ---------------------------------------------------------------------------
 // Core entity interfaces
 // ---------------------------------------------------------------------------

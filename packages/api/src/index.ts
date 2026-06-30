@@ -12,6 +12,7 @@ import { requestsRouter } from './routes/requests.js';
 import { bookingsRouter } from './routes/bookings.js';
 import { tripsRouter } from './routes/trips.js';
 import { contributionsRouter } from './routes/contributions.js';
+import { placesRouter } from './routes/places.js';
 import { runMatcher } from './services/matching.js';
 import { getWeekStartMonday } from '@commutepool/shared';
 
@@ -53,6 +54,7 @@ app.route('/requests', requestsRouter);
 app.route('/bookings', bookingsRouter);
 app.route('/trips', tripsRouter);
 app.route('/contributions', contributionsRouter);
+app.route('/places', placesRouter);
 
 // ---------------------------------------------------------------------------
 // 404 fallback
