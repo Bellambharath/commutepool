@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import PlaceSearch from '@/components/PlaceSearch';
+import RouteMap from '@/components/RouteMap';
 import {
   getGoogleRoutes,
   createRoute,
@@ -49,6 +50,8 @@ export default function NewRoutePage() {
   }
 
   const canFindRoutes = !!source && !!destination && !!accessToken;
+  const selectedIndex =
+    routeOptions && selectedRoute ? routeOptions.indexOf(selectedRoute) : null;
 
   async function handleFindRoutes() {
     if (!source || !destination || !accessToken) return;
@@ -203,6 +206,19 @@ export default function NewRoutePage() {
 
         {fetchRoutesError && (
           <p role="alert" className="text-sm text-red-600">{fetchRoutesError}</p>
+        )}
+
+        {/* Map — shown above the card list once routes are available */}
+        {routeOptions !== null && source && destination && (
+          <RouteMap
+            routes={routeOptions}
+            selectedIndex={selectedIndex}
+            onSelect={(i) => { setSelectedRoute(routeOptions![i] ?? null); setSaveError(null); }}
+            sourceLat={source.lat}
+            sourceLng={source.lng}
+            destinationLat={destination.lat}
+            destinationLng={destination.lng}
+          />
         )}
 
         {/* Route option cards */}
