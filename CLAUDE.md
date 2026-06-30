@@ -204,8 +204,13 @@ npm run dev
   "HITEC City", lat 17.4470457, lng 78.3778342). Files: packages/api/src/services/places.ts
   (new), packages/api/src/routes/places.ts (new), packages/api/src/index.ts (mount),
   packages/shared/src/types/index.ts (PlaceSuggestion type added).
-- Not started: owner route-creation UI, owner offer-posting UI, rider request
-  UI (places-search endpoint now available), list/empty-state views,
+- Owner route-creation UI — DONE, API payload verified end-to-end via PowerShell
+  (POST /routes HTTP 201 with exact frontend payload). Browser click-through pending
+  human sign-off. Files: packages/web/lib/api.ts (PlaceResult, RouteOption,
+  CreateRouteBody + 3 typed callers), packages/web/components/PlaceSearch.tsx (new),
+  packages/web/app/routes/new/page.tsx (new). Pre-existing type error in
+  login/page.tsx:60 (match[1] string|undefined) is out of scope and predates this work.
+- Not started: owner offer-posting UI, rider request UI, list/empty-state views,
   Prompt 10 (cancellation strikes — deliberately deferred), admin portal.
 
 ## KNOWN DEFERRED DEBT (do not fix unless explicitly asked)

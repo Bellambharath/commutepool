@@ -141,6 +141,74 @@ export async function logout(accessToken: string): Promise<ApiResponse<{ message
 }
 
 // ---------------------------------------------------------------------------
+// Places & Routes
+// ---------------------------------------------------------------------------
+
+export interface PlaceResult {
+  placeId: string;
+  displayName: string;
+  formattedAddress: string;
+  lat: number;
+  lng: number;
+}
+
+export async function searchPlaces(
+  query: string,
+  accessToken: string,
+): Promise<ApiResponse<{ places: PlaceResult[] }>> {
+  return apiFetch<{ places: PlaceResult[] }>(
+    `/places/search?q=${encodeURIComponent(query)}`,
+    { accessToken },
+  );
+}
+
+export interface RouteOption {
+  encodedPolyline: string;
+  distanceMeters: number;
+  durationSeconds: number;
+  routeLabel: string;
+}
+
+export async function getGoogleRoutes(
+  originPlaceId: string,
+  destinationPlaceId: string,
+  accessToken: string,
+): Promise<ApiResponse<{ routes: RouteOption[] }>> {
+  return apiFetch<{ routes: RouteOption[] }>(
+    `/routes/google?originPlaceId=${encodeURIComponent(originPlaceId)}&destinationPlaceId=${encodeURIComponent(destinationPlaceId)}`,
+    { accessToken },
+  );
+}
+
+export interface CreateRouteBody {
+  period: 'MORNING' | 'EVENING';
+  sourcePlaceId: string;
+  sourceLat: number;
+  sourceLng: number;
+  sourceAddress: string;
+  destinationPlaceId: string;
+  destinationLat: number;
+  destinationLng: number;
+  destinationAddress: string;
+  encodedPolyline: string;
+  distanceMeters: number;
+  durationSeconds: number;
+  routeLabel?: string;
+  isPrimary: boolean;
+}
+
+export async function createRoute(
+  body: CreateRouteBody,
+  accessToken: string,
+): Promise<ApiResponse<{ route: unknown }>> {
+  return apiFetch<{ route: unknown }>('/routes', {
+    method: 'POST',
+    accessToken,
+    body: JSON.stringify(body),
+  });
+}
+
+// ---------------------------------------------------------------------------
 // 401-retry helper
 // ---------------------------------------------------------------------------
 
