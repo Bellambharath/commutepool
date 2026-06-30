@@ -209,6 +209,54 @@ export async function createRoute(
 }
 
 // ---------------------------------------------------------------------------
+// Commute Routes
+// ---------------------------------------------------------------------------
+
+export interface CommuteRoute {
+  id: string;
+  period: 'MORNING' | 'EVENING';
+  route_label: string | null;
+  source_address: string;
+  destination_address: string;
+  distance_meters: number;
+  duration_seconds: number;
+  is_primary: boolean;
+}
+
+export async function getMyRoutes(
+  accessToken: string,
+  period?: 'MORNING' | 'EVENING',
+): Promise<ApiResponse<{ routes: CommuteRoute[] }>> {
+  const query = period ? `?period=${period}` : '';
+  return apiFetch<{ routes: CommuteRoute[] }>(`/routes${query}`, { accessToken });
+}
+
+// ---------------------------------------------------------------------------
+// Offers
+// ---------------------------------------------------------------------------
+
+export interface CreateOfferBody {
+  routeId: string;
+  period: 'MORNING' | 'EVENING';
+  weekStartDate: string;
+  daysAvailable: number[];
+  departureWindowStart: string;
+  departureWindowEnd: string;
+  seatsAvailable?: number;
+}
+
+export async function createOffer(
+  body: CreateOfferBody,
+  accessToken: string,
+): Promise<ApiResponse<{ offer: unknown }>> {
+  return apiFetch<{ offer: unknown }>('/offers', {
+    method: 'POST',
+    accessToken,
+    body: JSON.stringify(body),
+  });
+}
+
+// ---------------------------------------------------------------------------
 // 401-retry helper
 // ---------------------------------------------------------------------------
 

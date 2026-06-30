@@ -212,7 +212,15 @@ npm run dev
   Files: components/RouteMap.tsx (new), app/routes/new/page.tsx (additive),
   .env.local.example (updated), package.json (@types/google.maps devDep added).
   tsc --noEmit: exit 0. Browser click-through pending human sign-off.
-- Not started: owner offer-posting UI, rider request UI, list/empty-state views,
+- Owner offer-posting UI — DONE and API-verified. Route picker (cards, period
+  locked to route's period), week selector ("This week"/"Next week" via
+  getWeekStartMonday from @commutepool/shared — no inline date math), day toggles,
+  departure window inputs, seats stepper. All documented error codes handled (403,
+  400, 404, 409). Verified: POST /offers returned HTTP 201 { id:"990ed913-...",
+  week_start_date:"2026-06-29", days_available:[1,2,3,4,5] }. Files:
+  packages/web/lib/api.ts (CommuteRoute, getMyRoutes, CreateOfferBody, createOffer),
+  packages/web/app/offers/new/page.tsx (new). tsc --noEmit: exit 0.
+- Not started: rider request UI, list/empty-state views,
   Prompt 10 (cancellation strikes — deliberately deferred), admin portal.
 
 ## KNOWN DEFERRED DEBT (do not fix unless explicitly asked)
