@@ -57,7 +57,7 @@ export default function LoginPage() {
       setStep('otp');
     } else {
       const match = res.error?.match(/(\d+) seconds/);
-      if (match) setRetryAfter(parseInt(match[1], 10));
+      if (match) setRetryAfter(parseInt(match[1] ?? '0', 10));
       setError(res.error ?? 'Failed to send OTP. Please try again.');
     }
   }
