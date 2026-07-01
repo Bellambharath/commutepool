@@ -257,6 +257,37 @@ export async function createOffer(
 }
 
 // ---------------------------------------------------------------------------
+// Rider Requests
+// ---------------------------------------------------------------------------
+
+export interface CreateRequestBody {
+  period: 'MORNING' | 'EVENING';
+  weekStartDate: string;
+  daysNeeded: number[];
+  pickupLat: number;
+  pickupLng: number;
+  pickupAddress: string;
+  pickupPlaceId: string;
+  dropoffLat: number;
+  dropoffLng: number;
+  dropoffAddress: string;
+  dropoffPlaceId: string;
+  departureWindowStart: string;
+  departureWindowEnd: string;
+}
+
+export async function createRequest(
+  body: CreateRequestBody,
+  accessToken: string,
+): Promise<ApiResponse<{ request: unknown }>> {
+  return apiFetch<{ request: unknown }>('/requests', {
+    method: 'POST',
+    accessToken,
+    body: JSON.stringify(body),
+  });
+}
+
+// ---------------------------------------------------------------------------
 // 401-retry helper
 // ---------------------------------------------------------------------------
 

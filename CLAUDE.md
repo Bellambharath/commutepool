@@ -220,7 +220,15 @@ npm run dev
   week_start_date:"2026-06-29", days_available:[1,2,3,4,5] }. Files:
   packages/web/lib/api.ts (CommuteRoute, getMyRoutes, CreateOfferBody, createOffer),
   packages/web/app/offers/new/page.tsx (new). tsc --noEmit: exit 0.
-- Not started: rider request UI, list/empty-state views,
+- Rider request UI — DONE and API-verified. Period, week (getWeekStartMonday,
+  no inline date math), day toggles, PlaceSearch for pickup + dropoff (mapping
+  verified: pickupLat=place.lat, pickupLng=place.lng, pickupAddress=
+  place.formattedAddress, pickupPlaceId=place.placeId — same for dropoff),
+  departure window. POST /requests 201 verified. Geometry check confirmed:
+  pickup_geom=POINT(78.3778342 17.4470457), dropoff_geom=POINT(78.3489168 17.4400802)
+  — not swapped. Files: packages/web/lib/api.ts (CreateRequestBody, createRequest),
+  packages/web/app/requests/new/page.tsx (new). tsc --noEmit: exit 0.
+- Not started: list/empty-state views,
   Prompt 10 (cancellation strikes — deliberately deferred), admin portal.
 
 ## KNOWN DEFERRED DEBT (do not fix unless explicitly asked)
