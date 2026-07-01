@@ -9,8 +9,7 @@ import { getWeekStartMonday } from '@commutepool/shared';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
 
-function formatRoute(r: CommuteRoute): string {
-  if (r.route_label) return r.route_label;
+function formatRouteLabel(r: CommuteRoute): string {
   const src = r.source_address.split(',')[0] ?? r.source_address;
   const dst = r.destination_address.split(',')[0] ?? r.destination_address;
   return `${src} → ${dst}`;
@@ -210,7 +209,10 @@ export default function NewOfferPage() {
                     : 'bg-white ring-gray-200 hover:bg-gray-50'
                   }`}
               >
-                <p className="truncate text-sm font-semibold text-gray-900">{formatRoute(r)}</p>
+                <p className="truncate text-sm font-semibold text-gray-900">{formatRouteLabel(r)}</p>
+                {r.route_label && (
+                  <p className="truncate text-xs text-gray-400">{r.route_label}</p>
+                )}
                 <span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-medium
                   ${r.period === 'MORNING'
                     ? 'bg-amber-100 text-amber-800'
@@ -243,7 +245,7 @@ export default function NewOfferPage() {
               >
                 <span className="font-semibold">{label}</span>
                 <span className={`block text-xs ${weekStartDate === value ? 'text-brand-light' : 'text-gray-400'}`}>
-                  Mon, {formatMonday(value)}
+                  {formatMonday(value)}
                 </span>
               </button>
             ))}
