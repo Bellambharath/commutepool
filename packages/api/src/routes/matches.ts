@@ -25,6 +25,7 @@ matchesRouter.get('/', async (c) => {
       offer: {
         select: {
           id: true,
+          owner_id: true,
           period: true,
           days_available: true,
           departure_window_start: true,
