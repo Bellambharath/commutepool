@@ -32,9 +32,11 @@ export default function MatchesPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const [actionBookingId, setActionBookingId] = useState<string | null>(null);
-  const [actionSubmitting, setActionSubmitting] = useState(false);
-  const [actionError, setActionError] = useState<string | null>(null);
+  const [actionState, setActionState] = useState<{
+    bookingId: string | null;
+    submitting: boolean;
+    error: { bookingId: string; message: string } | null;
+  }>({ bookingId: null, submitting: false, error: null });
 
   // Auth guard
   useEffect(() => {
@@ -122,15 +124,12 @@ export default function MatchesPage() {
 
   async function handleAccept(m: Match, bookingId: string) {
     if (!accessToken) return;
-    setActionBookingId(bookingId);
-    setActionSubmitting(true);
-    setActionError(null);
+    setActionState({ bookingId, submitting: true, error: null });
 
     const res = await acceptBooking(bookingId, accessToken);
-    setActionSubmitting(false);
-    setActionBookingId(null);
 
     if (res.success) {
+      setActionState({ bookingId: null, submitting: false, error: null });
       setMatches((prev) =>
         prev === null
           ? prev
@@ -147,20 +146,22 @@ export default function MatchesPage() {
       );
       return;
     }
-    setActionError(res.error ?? 'Failed to accept booking.');
+
+    setActionState({
+      bookingId: null,
+      submitting: false,
+      error: { bookingId, message: res.error ?? 'Failed to accept booking.' },
+    });
   }
 
   async function handleReject(m: Match, bookingId: string) {
     if (!accessToken) return;
-    setActionBookingId(bookingId);
-    setActionSubmitting(true);
-    setActionError(null);
+    setActionState({ bookingId, submitting: true, error: null });
 
     const res = await rejectBooking(bookingId, accessToken);
-    setActionSubmitting(false);
-    setActionBookingId(null);
 
     if (res.success) {
+      setActionState({ bookingId: null, submitting: false, error: null });
       setMatches((prev) =>
         prev === null
           ? prev
@@ -177,7 +178,12 @@ export default function MatchesPage() {
       );
       return;
     }
-    setActionError(res.error ?? 'Failed to decline booking.');
+
+    setActionState({
+      bookingId: null,
+      submitting: false,
+      error: { bookingId, message: res.error ?? 'Failed to decline booking.' },
+    });
   }
 
   if (matches.length === 0) {
@@ -286,23 +292,23 @@ export default function MatchesPage() {
                 ) : hasPending ? (() => {
                   const pendingBooking = m.bookings.find((b) => b.status === 'PENDING');
                   if (!pendingBooking) return null;
-                  const isThisAction = actionBookingId === pendingBooking.id;
+                  const isThisAction = actionState.bookingId === pendingBooking.id;
                   return (
                     <div className="mt-4 space-y-3 border-t border-gray-100 pt-4">
                       <p className="text-sm font-medium text-gray-700">Booking request received</p>
-                      {actionError && actionBookingId === pendingBooking.id && (
-                        <p role="alert" className="text-sm text-red-600">{actionError}</p>
+                      {actionState.error?.bookingId === pendingBooking.id && (
+                        <p role="alert" className="text-sm text-red-600">{actionState.error?.message}</p>
                       )}
                       <div className="flex gap-3">
                         <button
                           type="button"
-                          disabled={actionSubmitting}
+                          disabled={actionState.submitting}
                           onClick={() => handleReject(m, pendingBooking.id)}
                           className="flex-1 rounded-xl border border-gray-300 bg-white px-4 py-2.5
                                      text-sm font-semibold text-gray-700 transition-colors
                                      hover:bg-gray-50 disabled:opacity-50"
                         >
-                          {isThisAction && actionSubmitting ? (
+                          {isThisAction && actionState.submitting ? (
                             <span className="flex items-center justify-center">
                               <span className="h-4 w-4 animate-spin rounded-full border-2 border-gray-400 border-t-transparent" />
                             </span>
@@ -310,13 +316,13 @@ export default function MatchesPage() {
                         </button>
                         <button
                           type="button"
-                          disabled={actionSubmitting}
+                          disabled={actionState.submitting}
                           onClick={() => handleAccept(m, pendingBooking.id)}
                           className="flex flex-1 items-center justify-center rounded-xl bg-brand px-4 py-2.5
                                      text-sm font-semibold text-white transition-colors
                                      hover:bg-brand-dark active:bg-brand-darker disabled:opacity-50"
                         >
-                          {isThisAction && actionSubmitting ? (
+                          {isThisAction && actionState.submitting ? (
                             <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
                           ) : 'Accept'}
                         </button>
