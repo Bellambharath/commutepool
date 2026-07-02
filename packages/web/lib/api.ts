@@ -288,6 +288,79 @@ export async function createRequest(
 }
 
 // ---------------------------------------------------------------------------
+// Matches & Bookings
+// ---------------------------------------------------------------------------
+
+export interface MatchOffer {
+  id: string;
+  owner_id: string;
+  period: 'MORNING' | 'EVENING';
+  days_available: number[];
+  departure_window_start: string;
+  departure_window_end: string;
+  week_start_date: string;
+  route: {
+    source_address: string;
+    destination_address: string;
+    distance_meters: number;
+  };
+}
+
+export interface MatchRequest {
+  id: string;
+  days_needed: number[];
+  pickup_address: string;
+  dropoff_address: string;
+  week_start_date: string;
+}
+
+export interface MatchBooking {
+  id: string;
+  status: string;
+}
+
+/** Subset type — the API returns more fields; this covers what the UI needs. */
+export interface Match {
+  id: string;
+  offer_id: string;
+  request_id: string;
+  compatibility_score: number;
+  total_contribution_paise: number;
+  pickup_walk_meters: number;
+  dropoff_walk_meters: number;
+  is_partial_route: boolean;
+  route_usage_percentage: number;
+  created_at: string;
+  offer: MatchOffer;
+  request: MatchRequest;
+  bookings: MatchBooking[];
+}
+
+export async function getMatches(
+  accessToken: string,
+  week?: string,
+): Promise<ApiResponse<{ matches: Match[] }>> {
+  const query = week ? `?week=${encodeURIComponent(week)}` : '';
+  return apiFetch<{ matches: Match[] }>(`/matches${query}`, { accessToken });
+}
+
+export interface CreateBookingBody {
+  matchId: string;
+  daysConfirmed: number[];
+}
+
+export async function createBooking(
+  body: CreateBookingBody,
+  accessToken: string,
+): Promise<ApiResponse<{ booking: unknown }>> {
+  return apiFetch<{ booking: unknown }>('/bookings', {
+    method: 'POST',
+    accessToken,
+    body: JSON.stringify(body),
+  });
+}
+
+// ---------------------------------------------------------------------------
 // 401-retry helper
 // ---------------------------------------------------------------------------
 

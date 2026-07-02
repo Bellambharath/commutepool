@@ -4,6 +4,7 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
 
 const ROLE_LABEL: Record<string, string> = {
@@ -107,6 +108,18 @@ export default function HomePage() {
                 )}
               </dl>
             </div>
+
+            <Link
+              href="/matches"
+              className="mt-6 flex w-full items-center justify-between rounded-2xl bg-white p-5
+                         shadow-sm ring-1 ring-gray-200 transition-colors hover:bg-gray-50"
+            >
+              <span className="text-sm font-semibold text-gray-900">Your matches</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 text-gray-400" aria-hidden="true">
+                <path d="m9 18 6-6-6-6" />
+              </svg>
+            </Link>
 
             <div className="mt-6 rounded-2xl bg-brand-light p-5">
               <p className="text-sm font-medium text-brand-darker">
