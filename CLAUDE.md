@@ -194,21 +194,23 @@ Frontend — completed and browser+DB proven:
 - Owner route-creation with map: packages/web/app/routes/new/page.tsx + packages/web/components/RouteMap.tsx + packages/web/components/PlaceSearch.tsx
 - Owner offer-posting: packages/web/app/offers/new/page.tsx
 - Rider request submission: packages/web/app/requests/new/page.tsx
-- Shared API layer: packages/web/lib/api.ts (PlaceResult, RouteOption, CommuteRoute, CreateRouteBody, CreateOfferBody, CreateRequestBody, CreateBookingBody types + all callers)
+- Shared API layer: packages/web/lib/api.ts (PlaceResult, RouteOption, CommuteRoute, CreateRouteBody, CreateOfferBody, CreateRequestBody, CreateBookingBody, Match/MatchOffer/MatchRequest/MatchBooking types + all callers)
 
-Backend additions this session:
+Backend (prior sessions):
 - GET /places/search — Places API New proxy, server-side only, behind requireAuth (packages/api/src/routes/places.ts + services/places.ts)
 - GET /matches — returns matches for calling user (owner or rider), includes nested offer.route addresses, offer.owner_id, request pickup/dropoff addresses, bookings array with status (packages/api/src/routes/matches.ts)
 
 Matching engine: proven working with real data. On-demand trigger fires on POST /offers and POST /requests. Produced real Match rows with compatibility_score=100 and total_contribution_paise=2500 (₹25 minimum) against HITEC City → Gachibowli test data in Supabase.
 
-IMMEDIATE NEXT: /matches frontend screen (packages/web/app/matches/page.tsx)
-- Calls GET /matches
-- Shows match cards: route addresses, period, days overlap, contribution in rupees (divide paise by 100)
-- Role-aware actions: if match.offer.owner_id === current user's id → show "View booking" (owner sees incoming booking requests); else → show "Request booking" button calling POST /bookings with { matchId, daysConfirmed }
-- POST /bookings contract: body = { matchId: string (uuid), daysConfirmed: number[] (subset of days_available ∩ days_needed, at least one) }
-- On successful booking: show confirmation, link back to home
-- HEAD: 72fff3e
+This session (2026-07-02): /matches frontend screen built (packages/web/app/matches/page.tsx)
+- Match cards: truncated route addresses, period badge, ₹ contribution, days-overlap chips, walk distances, compatibility badge
+- Role-aware: owner (offer.owner_id === user.id) sees status text only (pending/booked/waiting — accept/reject UI is a LATER prompt); rider sees "Request booking" → inline day-confirmation (toggles over days_available ∩ days_needed, pre-selected) → POST /bookings, card updated in place on 201
+- getMatches/createBooking + Match types added to lib/api.ts; "Your matches" nav card added to app/home/page.tsx below account card
+- Verified: tsc --noEmit clean; GET /matches against live API returned 5 matches, every field type-validated against the new Match type, zero mismatches
+- NOT yet verified: rider booking path in browser. Seed user +919876543210 is BOTH and owns both sides of all current test matches, so every card renders the OWNER state. Rider-path browser test needs a second user (new phone via OTP). POST /bookings deliberately NOT called during verification to avoid a self-booking poisoning test data.
+
+IMMEDIATE NEXT: to be scoped by advisor. Natural candidates: browser test of rider booking path with a second user, then owner accept/reject UI on /matches (backend POST /bookings/:id/accept and /reject already exist and are proven).
+- HEAD: ff04871
 
 ## KNOWN DEFERRED DEBT (do not fix unless explicitly asked)
 
@@ -225,5 +227,6 @@ IMMEDIATE NEXT: /matches frontend screen (packages/web/app/matches/page.tsx)
 - Prompt 10 (cancellation strikes/suspensions) deliberately deferred — Cancellation rows record penalty_applied: 0 placeholder.
 - Route-deviation detection (Prompt 9b) blocked on mobile GPS — deferred until React Native exists.
 - List/empty-state views for routes, offers, requests not yet built — deferred until create flows existed (they now do).
+- POST /bookings allows only ONE booking row per match_id ever (any status) — a DECLINED/CANCELLED/EXPIRED booking permanently blocks re-booking that match. The /matches UI shows "Request booking" again after a dead booking and surfaces the resulting 409 as an error message. Decide re-booking semantics (allow new booking when no PENDING/ACCEPTED exists?) in a later prompt. Note: BookingStatus enum is PENDING/ACCEPTED/DECLINED/EXPIRED/CANCELLED — there is no REJECTED status despite some task docs saying "REJECTED".
 - Admin portal not started.
 - React Native Expo app deferred — build last after pilot validates matching.
