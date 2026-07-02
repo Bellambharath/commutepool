@@ -211,8 +211,14 @@ Matching engine: proven working with real data. On-demand trigger fires on POST 
 
 Session (2026-07-02) bugfix history worth knowing for next session: the first accept/reject implementation tracked `actionBookingId` and `actionError` as two separate useState variables, cleared in sequence on the failure path. Under React 18 automatic batching, both updates land in the same render, so the render guard comparing them could never be true — errors were silently swallowed. Verified via a real race (reject a booking server-side while the browser's stale UI still shows it PENDING, then click Accept → genuine 400, no error text ever appeared). Fixed by replacing both with one atomic state object (`actionState: { bookingId, submitting, error: { bookingId, message } | null }`) so submitting state and the error update together in a single render. Re-verified the same way: error text now renders correctly, success path still works. If touching action-error UI patterns elsewhere in this app, use the single-object pattern, not parallel useState calls whose ordering matters.
 
-IMMEDIATE NEXT: to be scoped by advisor. Natural candidates: Prompt 10 (cancellation strikes/suspensions), admin portal, or re-booking semantics (see KNOWN DEFERRED DEBT below — now partially resolved, re-read before assuming it's still fully open).
-- HEAD: e3cc7fb
+/trips frontend screen (packages/web/app/trips/page.tsx), list-only — no lifecycle action buttons (arriving/start/complete/cancel are a later prompt):
+- Cards render exactly what GET /trips returns: scheduled_date formatted via toLocaleDateString('en-IN', {weekday:'short',day:'numeric',month:'short',timeZone:'Asia/Kolkata'}) e.g. "Mon, 22 Jun"; status badge (colour-coded per status, COMPLETED and IN_PROGRESS share green); period badge (same amber/indigo style as matches); Departure row (scheduled_departure as-is); Contribution row (booking.contribution_per_day_paise); role text ("You're the owner"/"You're the rider" from trip.owner_id === user.id). No route addresses or names rendered — GET /trips doesn't return them.
+- Polls GET /trips every 30s, same pattern as matches (separate useEffect, silent failure).
+- getTrips + Trip/TripStatus/TripBooking/TripContribution types in lib/api.ts.
+- Browser-proven both roles against real data: owner (+919876543210) saw 13 trips including one COMPLETED (green badge); rider (+919000000001) saw 10 trips, all "You're the rider", correctly excluding the owner-only trips from before the rider's first booking existed.
+
+IMMEDIATE NEXT: to be scoped by advisor. Natural candidates: trip lifecycle action buttons (arriving/start/pickup-confirmed/complete/cancel — backend endpoints already exist and are proven, per trips.ts), contributions/payment confirmation UI, Prompt 10 (cancellation strikes/suspensions), admin portal, or re-booking semantics (see KNOWN DEFERRED DEBT below — partially resolved, re-read before assuming it's still fully open).
+- HEAD: f98b505
 
 ## KNOWN DEFERRED DEBT (do not fix unless explicitly asked)
 
