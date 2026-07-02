@@ -202,7 +202,7 @@ Backend (prior sessions):
 
 Matching engine: proven working with real data. On-demand trigger fires on POST /offers and POST /requests. Produced real Match rows with compatibility_score=100 and total_contribution_paise=2500 (₹25 minimum) against HITEC City → Gachibowli test data in Supabase.
 
-This session (2026-07-02): /matches frontend screen built (packages/web/app/matches/page.tsx)
+Latest session (2026-07-02): /matches frontend screen built (packages/web/app/matches/page.tsx)
 - Match cards: truncated route addresses, period badge, ₹ contribution, days-overlap chips, walk distances, compatibility badge
 - Role-aware: owner (offer.owner_id === user.id) sees status text only (pending/booked/waiting — accept/reject UI is a LATER prompt); rider sees "Request booking" → inline day-confirmation (toggles over days_available ∩ days_needed, pre-selected) → POST /bookings, card updated in place on 201
 - getMatches/createBooking + Match types added to lib/api.ts; "Your matches" nav card added to app/home/page.tsx below account card
