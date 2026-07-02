@@ -185,62 +185,45 @@ npm run dev
 
 ## CURRENT STATUS (update this section as work progresses)
 
-- Backend: feature-complete and runtime-proven end-to-end through Prompt 9a
-  (auth → profile → routes → offers → requests → matching → booking → trip
-  lifecycle → SOS → payment confirmation).
-- Auth refactor: refresh token moved to httpOnly cookie, CORS fixed — DONE,
-  proven in PowerShell and in-browser including rotation, logout, and the
-  returning-session redirect case.
-- Frontend: PWA slice 1 complete — login (OTP), profile-setup, home stub.
-  Proven in-browser: new user → profile-setup → home; returning ACTIVE user →
-  home directly; already-authed user hitting /login → bounced to home; cookie
-  survives hard refresh.
-- `GET /places/search` backend proxy — DONE and runtime-proven. Raw fetch to
-  Places API New (`POST places.googleapis.com/v1/places:searchText`), field
-  mask `places.id,places.displayName,places.formattedAddress,places.location`,
-  behind `requireAuth`, returns `{ success, data: { places: PlaceSuggestion[] }, error }`.
-  Verified in-process: OTP flow for +919876543210 → token → GET /places/search?q=Hitech City Hyderabad
-  returned HTTP 200 with real Places API data (placeId ChIJ32ldjNyTyzsR7qB_VeuLaBk,
-  "HITEC City", lat 17.4470457, lng 78.3778342). Files: packages/api/src/services/places.ts
-  (new), packages/api/src/routes/places.ts (new), packages/api/src/index.ts (mount),
-  packages/shared/src/types/index.ts (PlaceSuggestion type added).
-- Owner route-creation UI — DONE with map visualization. Map uses
-  @googlemaps/js-api-loader, libraries:['geometry'], google.maps.geometry.encoding.decodePath.
-  Selected polyline: brand teal #01696f weight 5; unselected: gray weight 3. Polyline
-  click syncs card highlight and vice versa. NEXT_PUBLIC_GOOGLE_MAPS_API_KEY must be set
-  in .env.local (same value as backend GOOGLE_MAPS_API_KEY) — see .env.local.example.
-  Files: components/RouteMap.tsx (new), app/routes/new/page.tsx (additive),
-  .env.local.example (updated), package.json (@types/google.maps devDep added).
-  tsc --noEmit: exit 0. Browser click-through pending human sign-off.
-- Owner offer-posting UI — DONE and API-verified. Route picker (cards, period
-  locked to route's period), week selector ("This week"/"Next week" via
-  getWeekStartMonday from @commutepool/shared — no inline date math), day toggles,
-  departure window inputs, seats stepper. All documented error codes handled (403,
-  400, 404, 409). Verified: POST /offers returned HTTP 201 { id:"990ed913-...",
-  week_start_date:"2026-06-29", days_available:[1,2,3,4,5] }. Files:
-  packages/web/lib/api.ts (CommuteRoute, getMyRoutes, CreateOfferBody, createOffer),
-  packages/web/app/offers/new/page.tsx (new). tsc --noEmit: exit 0.
-- Rider request UI — DONE and API-verified. Period, week (getWeekStartMonday,
-  no inline date math), day toggles, PlaceSearch for pickup + dropoff (mapping
-  verified: pickupLat=place.lat, pickupLng=place.lng, pickupAddress=
-  place.formattedAddress, pickupPlaceId=place.placeId — same for dropoff),
-  departure window. POST /requests 201 verified. Geometry check confirmed:
-  pickup_geom=POINT(78.3778342 17.4470457), dropoff_geom=POINT(78.3489168 17.4400802)
-  — not swapped. Files: packages/web/lib/api.ts (CreateRequestBody, createRequest),
-  packages/web/app/requests/new/page.tsx (new). tsc --noEmit: exit 0.
-- Not started: list/empty-state views,
-  Prompt 10 (cancellation strikes — deliberately deferred), admin portal.
+Backend: feature-complete and runtime-proven end-to-end through Prompt 9a. All endpoints proven against real Supabase DB.
+
+Auth refactor: refresh token in httpOnly cookie, CORS fixed. Proven in-browser including rotation, logout, returning-session redirect.
+
+Frontend — completed and browser+DB proven:
+- PWA slice 1: login (OTP), profile-setup, home stub (packages/web/app/login, profile-setup, home)
+- Owner route-creation with map: packages/web/app/routes/new/page.tsx + packages/web/components/RouteMap.tsx + packages/web/components/PlaceSearch.tsx
+- Owner offer-posting: packages/web/app/offers/new/page.tsx
+- Rider request submission: packages/web/app/requests/new/page.tsx
+- Shared API layer: packages/web/lib/api.ts (PlaceResult, RouteOption, CommuteRoute, CreateRouteBody, CreateOfferBody, CreateRequestBody, CreateBookingBody types + all callers)
+
+Backend additions this session:
+- GET /places/search — Places API New proxy, server-side only, behind requireAuth (packages/api/src/routes/places.ts + services/places.ts)
+- GET /matches — returns matches for calling user (owner or rider), includes nested offer.route addresses, offer.owner_id, request pickup/dropoff addresses, bookings array with status (packages/api/src/routes/matches.ts)
+
+Matching engine: proven working with real data. On-demand trigger fires on POST /offers and POST /requests. Produced real Match rows with compatibility_score=100 and total_contribution_paise=2500 (₹25 minimum) against HITEC City → Gachibowli test data in Supabase.
+
+IMMEDIATE NEXT: /matches frontend screen (packages/web/app/matches/page.tsx)
+- Calls GET /matches
+- Shows match cards: route addresses, period, days overlap, contribution in rupees (divide paise by 100)
+- Role-aware actions: if match.offer.owner_id === current user's id → show "View booking" (owner sees incoming booking requests); else → show "Request booking" button calling POST /bookings with { matchId, daysConfirmed }
+- POST /bookings contract: body = { matchId: string (uuid), daysConfirmed: number[] (subset of days_available ∩ days_needed, at least one) }
+- On successful booking: show confirmation, link back to home
+- HEAD: 72fff3e
 
 ## KNOWN DEFERRED DEBT (do not fix unless explicitly asked)
 
-- `refresh_tokens` table has no cleanup job — rows accumulate forever. Fine
-  for pilot scale, not for production.
-- `firstZodError` helper in `packages/api/src/routes/auth.ts` is dead code
-  (unused export) since the cookie refactor removed its only caller.
-- No shared route-guard component on the frontend yet — each protected page
-  duplicates its own auth check. Fine for 2 pages, revisit at 3+.
-- GOOGLE_MAPS_API_KEY and DB password have appeared in plaintext in past chat
-  history — must be rotated before any public (non-pilot) launch.
-- Google Maps API key currently has no restrictions (HTTP referrer / API
-  restrictions) — must be restricted before public launch. Less urgent now
-  that Maps calls are backend-only, but still real exposure if the key leaks.
+- refresh_tokens table has no cleanup job — rows accumulate forever. Fine for pilot scale.
+- firstZodError helper in packages/api/src/routes/auth.ts is dead code (unused export since cookie refactor).
+- No shared route-guard component on frontend — each protected page duplicates its own auth check. Revisit when adding 4th+ protected screen.
+- GOOGLE_MAPS_API_KEY and DB password have appeared in plaintext in past chat history — rotate before public launch.
+- Google Maps API key has no restrictions — restrict before public launch. Less urgent since Maps calls are backend-proxied except map rendering (client-side uses NEXT_PUBLIC_GOOGLE_MAPS_API_KEY).
+- NEXT_PUBLIC_GOOGLE_MAPS_API_KEY must be added to Railway env before deploy.
+- ADMIN_SOS_PHONE must be added to Railway env before deploy.
+- Supabase free-tier auto-pause will break pilot if DB sits idle — decide on paid tier or keep-alive before pilot launch.
+- icon-192.png and icon-512.png missing from packages/web/public/ — PWA install ("Add to Home Screen") will fail until these exist.
+- enableAllProjectMcpServers: true in .claude/settings.local.json — revisit before adding any new MCP with write access.
+- Prompt 10 (cancellation strikes/suspensions) deliberately deferred — Cancellation rows record penalty_applied: 0 placeholder.
+- Route-deviation detection (Prompt 9b) blocked on mobile GPS — deferred until React Native exists.
+- List/empty-state views for routes, offers, requests not yet built — deferred until create flows existed (they now do).
+- Admin portal not started.
+- React Native Expo app deferred — build last after pilot validates matching.
