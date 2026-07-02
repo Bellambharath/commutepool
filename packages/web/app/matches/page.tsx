@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
-import { getMatches, createBooking, type Match } from '@/lib/api';
+import { getMatches, createBooking, acceptBooking, rejectBooking, type Match } from '@/lib/api';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
 
@@ -32,6 +32,10 @@ export default function MatchesPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
+  const [actionBookingId, setActionBookingId] = useState<string | null>(null);
+  const [actionSubmitting, setActionSubmitting] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+
   // Auth guard
   useEffect(() => {
     if (status === 'anon') router.replace('/login');
@@ -48,6 +52,18 @@ export default function MatchesPage() {
       }
       setMatches(res.data.matches);
     });
+  }, [status, accessToken]);
+
+  useEffect(() => {
+    if (status !== 'authed' || !accessToken) return;
+    const id = setInterval(() => {
+      getMatches(accessToken).then((res) => {
+        if (res.success && res.data) {
+          setMatches(res.data.matches);
+        }
+      });
+    }, 30_000);
+    return () => clearInterval(id);
   }, [status, accessToken]);
 
   if (status === 'loading' || matches === null || !user) {
@@ -102,6 +118,66 @@ export default function MatchesPage() {
     } else {
       setSubmitError(res.error ?? 'Failed to request booking. Please try again.');
     }
+  }
+
+  async function handleAccept(m: Match, bookingId: string) {
+    if (!accessToken) return;
+    setActionBookingId(bookingId);
+    setActionSubmitting(true);
+    setActionError(null);
+
+    const res = await acceptBooking(bookingId, accessToken);
+    setActionSubmitting(false);
+    setActionBookingId(null);
+
+    if (res.success) {
+      setMatches((prev) =>
+        prev === null
+          ? prev
+          : prev.map((x) =>
+              x.id === m.id
+                ? {
+                    ...x,
+                    bookings: x.bookings.map((b) =>
+                      b.id === bookingId ? { ...b, status: 'ACCEPTED' } : b,
+                    ),
+                  }
+                : x,
+            ),
+      );
+      return;
+    }
+    setActionError(res.error ?? 'Failed to accept booking.');
+  }
+
+  async function handleReject(m: Match, bookingId: string) {
+    if (!accessToken) return;
+    setActionBookingId(bookingId);
+    setActionSubmitting(true);
+    setActionError(null);
+
+    const res = await rejectBooking(bookingId, accessToken);
+    setActionSubmitting(false);
+    setActionBookingId(null);
+
+    if (res.success) {
+      setMatches((prev) =>
+        prev === null
+          ? prev
+          : prev.map((x) =>
+              x.id === m.id
+                ? {
+                    ...x,
+                    bookings: x.bookings.map((b) =>
+                      b.id === bookingId ? { ...b, status: 'DECLINED' } : b,
+                    ),
+                  }
+                : x,
+            ),
+      );
+      return;
+    }
+    setActionError(res.error ?? 'Failed to decline booking.');
   }
 
   if (matches.length === 0) {
@@ -205,15 +281,51 @@ export default function MatchesPage() {
               )}
 
               {isOwner ? (
-                // OWNER of this match — no booking button, status text only.
-                // Accept/reject UI is a later prompt.
-                <p className="mt-3 text-sm font-medium text-gray-600">
-                  {hasPending
-                    ? 'Booking request pending — awaiting your response'
-                    : hasAccepted
-                      ? 'Booked ✓'
-                      : 'Waiting for rider to book'}
-                </p>
+                hasAccepted ? (
+                  <p className="mt-3 text-sm font-medium text-green-700">Booked ✓</p>
+                ) : hasPending ? (() => {
+                  const pendingBooking = m.bookings.find((b) => b.status === 'PENDING');
+                  if (!pendingBooking) return null;
+                  const isThisAction = actionBookingId === pendingBooking.id;
+                  return (
+                    <div className="mt-4 space-y-3 border-t border-gray-100 pt-4">
+                      <p className="text-sm font-medium text-gray-700">Booking request received</p>
+                      {actionError && actionBookingId === pendingBooking.id && (
+                        <p role="alert" className="text-sm text-red-600">{actionError}</p>
+                      )}
+                      <div className="flex gap-3">
+                        <button
+                          type="button"
+                          disabled={actionSubmitting}
+                          onClick={() => handleReject(m, pendingBooking.id)}
+                          className="flex-1 rounded-xl border border-gray-300 bg-white px-4 py-2.5
+                                     text-sm font-semibold text-gray-700 transition-colors
+                                     hover:bg-gray-50 disabled:opacity-50"
+                        >
+                          {isThisAction && actionSubmitting ? (
+                            <span className="flex items-center justify-center">
+                              <span className="h-4 w-4 animate-spin rounded-full border-2 border-gray-400 border-t-transparent" />
+                            </span>
+                          ) : 'Decline'}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={actionSubmitting}
+                          onClick={() => handleAccept(m, pendingBooking.id)}
+                          className="flex flex-1 items-center justify-center rounded-xl bg-brand px-4 py-2.5
+                                     text-sm font-semibold text-white transition-colors
+                                     hover:bg-brand-dark active:bg-brand-darker disabled:opacity-50"
+                        >
+                          {isThisAction && actionSubmitting ? (
+                            <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                          ) : 'Accept'}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })() : (
+                  <p className="mt-3 text-sm font-medium text-gray-600">Waiting for rider to book</p>
+                )
               ) : hasAccepted ? (
                 <p className="mt-3 text-sm font-medium text-green-700">Booked ✓</p>
               ) : hasPending ? (

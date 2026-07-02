@@ -360,6 +360,26 @@ export async function createBooking(
   });
 }
 
+export async function acceptBooking(
+  bookingId: string,
+  accessToken: string,
+): Promise<ApiResponse<{ booking: unknown }>> {
+  return apiFetch<{ booking: unknown }>(`/bookings/${bookingId}/accept`, {
+    method: 'POST',
+    accessToken,
+  });
+}
+
+export async function rejectBooking(
+  bookingId: string,
+  accessToken: string,
+): Promise<ApiResponse<{ booking: unknown }>> {
+  return apiFetch<{ booking: unknown }>(`/bookings/${bookingId}/reject`, {
+    method: 'POST',
+    accessToken,
+  });
+}
+
 // ---------------------------------------------------------------------------
 // 401-retry helper
 // ---------------------------------------------------------------------------
