@@ -100,14 +100,14 @@ bookingsRouter.post(
       );
     }
 
-    // RULE 2: one booking per match_id
+    // RULE 2: one ACTIVE (PENDING/ACCEPTED) booking per match_id — declined/expired/cancelled bookings do not block retry
     const existing = await prisma.booking.findFirst({
-      where: { match_id: body.matchId },
+      where: { match_id: body.matchId, status: { in: ['PENDING', 'ACCEPTED'] } },
       select: { id: true },
     });
     if (existing) {
       return c.json(
-        { success: false, data: null, error: 'A booking already exists for this match' },
+        { success: false, data: null, error: 'A pending or accepted booking already exists for this match' },
         409,
       );
     }
