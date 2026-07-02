@@ -380,6 +380,49 @@ export async function rejectBooking(
   });
 }
 
+export type TripStatus =
+  | 'SCHEDULED'
+  | 'ARRIVING'
+  | 'STARTED'
+  | 'IN_PROGRESS'
+  | 'COMPLETED'
+  | 'CANCELLED';
+
+export interface TripBooking {
+  id: string;
+  status: string;
+  contribution_per_day_paise: number;
+  days_confirmed: number[];
+}
+
+export interface TripContribution {
+  id: string;
+  amount_paise: number;
+  payment_method: string;
+  marked_paid_at: string | null;
+  confirmed_by_rider_at: string | null;
+}
+
+export interface Trip {
+  id: string;
+  status: TripStatus;
+  scheduled_date: string;
+  scheduled_departure: string;
+  period: 'MORNING' | 'EVENING';
+  rider_id: string;
+  owner_id: string;
+  booking: TripBooking;
+  contributions: TripContribution[];
+}
+
+export async function getTrips(
+  accessToken: string,
+  status?: TripStatus,
+): Promise<ApiResponse<{ trips: Trip[] }>> {
+  const query = status ? `?status=${encodeURIComponent(status)}` : '';
+  return apiFetch<{ trips: Trip[] }>(`/trips${query}`, { accessToken });
+}
+
 // ---------------------------------------------------------------------------
 // 401-retry helper
 // ---------------------------------------------------------------------------
