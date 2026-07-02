@@ -202,15 +202,17 @@ Backend (prior sessions):
 
 Matching engine: proven working with real data. On-demand trigger fires on POST /offers and POST /requests. Produced real Match rows with compatibility_score=100 and total_contribution_paise=2500 (₹25 minimum) against HITEC City → Gachibowli test data in Supabase.
 
-Latest session (2026-07-02): /matches frontend screen built (packages/web/app/matches/page.tsx)
+/matches frontend screen (packages/web/app/matches/page.tsx):
 - Match cards: truncated route addresses, period badge, ₹ contribution, days-overlap chips, walk distances, compatibility badge
-- Role-aware: owner (offer.owner_id === user.id) sees status text only (pending/booked/waiting — accept/reject UI is a LATER prompt); rider sees "Request booking" → inline day-confirmation (toggles over days_available ∩ days_needed, pre-selected) → POST /bookings, card updated in place on 201
-- getMatches/createBooking + Match types added to lib/api.ts; "Your matches" nav card added to app/home/page.tsx below account card
-- Verified: tsc --noEmit clean; GET /matches against live API returned 5 matches, every field type-validated against the new Match type, zero mismatches
-- NOT yet verified: rider booking path in browser. Seed user +919876543210 is BOTH and owns both sides of all current test matches, so every card renders the OWNER state. Rider-path browser test needs a second user (new phone via OTP). POST /bookings deliberately NOT called during verification to avoid a self-booking poisoning test data.
+- Rider: "Request booking" → inline day-confirmation (toggles over days_available ∩ days_needed, pre-selected) → POST /bookings, card updated in place on 201. Browser-proven with a second real user (+919000000001 via OTP).
+- Owner: pending booking shows "Booking request received" with Accept/Decline buttons (not static status text) → POST /bookings/:id/accept|reject, card updates in place to "Booked ✓" on success. Errors render inline on the specific pending booking's card without hiding the buttons. Browser-proven including a genuine backend 400 (race condition forced via direct API call) showing the real error text, not a placeholder.
+- Matches list polls GET /matches every 30s while authed (setInterval useEffect, cleans up on unmount/status change); silent failure on poll errors.
+- getMatches/createBooking/acceptBooking/rejectBooking + Match types in lib/api.ts.
 
-IMMEDIATE NEXT: to be scoped by advisor. Natural candidates: browser test of rider booking path with a second user, then owner accept/reject UI on /matches (backend POST /bookings/:id/accept and /reject already exist and are proven).
-- HEAD: ff04871
+Session (2026-07-02) bugfix history worth knowing for next session: the first accept/reject implementation tracked `actionBookingId` and `actionError` as two separate useState variables, cleared in sequence on the failure path. Under React 18 automatic batching, both updates land in the same render, so the render guard comparing them could never be true — errors were silently swallowed. Verified via a real race (reject a booking server-side while the browser's stale UI still shows it PENDING, then click Accept → genuine 400, no error text ever appeared). Fixed by replacing both with one atomic state object (`actionState: { bookingId, submitting, error: { bookingId, message } | null }`) so submitting state and the error update together in a single render. Re-verified the same way: error text now renders correctly, success path still works. If touching action-error UI patterns elsewhere in this app, use the single-object pattern, not parallel useState calls whose ordering matters.
+
+IMMEDIATE NEXT: to be scoped by advisor. Natural candidates: Prompt 10 (cancellation strikes/suspensions), admin portal, or re-booking semantics (see KNOWN DEFERRED DEBT below — now partially resolved, re-read before assuming it's still fully open).
+- HEAD: e3cc7fb
 
 ## KNOWN DEFERRED DEBT (do not fix unless explicitly asked)
 
@@ -227,6 +229,7 @@ IMMEDIATE NEXT: to be scoped by advisor. Natural candidates: browser test of rid
 - Prompt 10 (cancellation strikes/suspensions) deliberately deferred — Cancellation rows record penalty_applied: 0 placeholder.
 - Route-deviation detection (Prompt 9b) blocked on mobile GPS — deferred until React Native exists.
 - List/empty-state views for routes, offers, requests not yet built — deferred until create flows existed (they now do).
-- POST /bookings allows only ONE booking row per match_id ever (any status) — a DECLINED/CANCELLED/EXPIRED booking permanently blocks re-booking that match. The /matches UI shows "Request booking" again after a dead booking and surfaces the resulting 409 as an error message. Decide re-booking semantics (allow new booking when no PENDING/ACCEPTED exists?) in a later prompt. Note: BookingStatus enum is PENDING/ACCEPTED/DECLINED/EXPIRED/CANCELLED — there is no REJECTED status despite some task docs saying "REJECTED".
+- RESOLVED (2026-07-02, commit ab6e5af): POST /bookings RULE 2 now only blocks on an existing PENDING/ACCEPTED booking for the match_id — a DECLINED/EXPIRED/CANCELLED booking no longer permanently blocks retry. Verified end-to-end via a real rider booking flow after a DECLINED prior attempt. Note: BookingStatus enum is PENDING/ACCEPTED/DECLINED/EXPIRED/CANCELLED — there is no REJECTED status despite some task docs saying "REJECTED".
+- POST /bookings/:id/accept RULE 6 (cannot accept within 30 min of departure_window_start on the earliest confirmed day) will permanently block acceptance if a booking's earliest confirmed day has already passed — there is no path to un-stick a booking whose week has partially elapsed with a still-PENDING booking on it. Hit this for real during testing (a booking for week 2026-06-29 was unacceptable by 2026-07-02). Not necessarily a bug — may be correct pilot behavior (an owner shouldn't be able to "accept" a ride that already happened) — but there's currently no UI affordance explaining *why* Accept is failing in this specific case vs. a genuine race/error, since the 400 message ("Cannot accept: departure is in -X minutes...") is technical. Consider a friendlier message or an auto-expire path for these.
 - Admin portal not started.
 - React Native Expo app deferred — build last after pilot validates matching.
